@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/bmizerany/pat"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -15,7 +16,94 @@ import (
 // The secret for checking the HMAC on requests
 var secret []byte
 
+type CacheEntry struct {
+	headers map[string]string
+	body    []byte
+}
+
+type ReadRequest struct {
+	key string
+	ch  chan *CacheEntry
+}
+
+type SaveRequest struct {
+	key   string
+	entry *CacheEntry
+}
+
+var readChan chan ReadRequest
+var saveChan chan SaveRequest
+
+// Run the cache in its own goroutine
+func runCache() {
+	// TODO don't use an in-memory cache, but a file-disk one
+	cache := make(map[string]CacheEntry)
+
+	for {
+		select {
+		case read := <-readChan:
+			entry, ok := cache[read.key]
+			if ok {
+				read.ch <- &entry
+			} else {
+				read.ch <- nil
+			}
+		case save := <-saveChan:
+			cache[save.key] = *save.entry
+		}
+	}
+}
+
+// Generate a key for cache from a string
+func generateKeyForCache(s string) string {
+	h := sha1.New()
+	io.WriteString(h, s)
+	key := h.Sum(nil)
+
+	// Use 2 levels of hasing to avoid having too many files in the same directory
+	key[3] = '/'
+	key[7] = '/'
+
+	return fmt.Sprintf("%x", key)
+}
+
+// Fetch image from cache
+func fetchImageFromCache(key string) (headers map[string]string, body []byte, ok bool) {
+	ch := make(chan *CacheEntry)
+	readChan <- ReadRequest{key, ch}
+	entry := <-ch
+	if ok = entry != nil; ok {
+		headers = entry.headers
+		body = entry.body
+	}
+	return
+}
+
+// Save the body and the headers in cache
+func saveImageInCache(key string, headers map[string]string, body []byte) {
+	entry := CacheEntry{headers, body}
+	saveChan <- SaveRequest{key, &entry}
+}
+
+// Fetch image from cache if available, or from the server
 func fetchImage(url string) (headers map[string]string, body []byte, err error) {
+	key := generateKeyForCache(url)
+
+	headers, body, ok := fetchImageFromCache(key)
+	if ok {
+		return
+	}
+
+	headers, body, err = fetchImageFromServer(url)
+	if err == nil {
+		go saveImageInCache(key, headers, body)
+	}
+
+	return
+}
+
+// Fetch the image from the distant server
+func fetchImageFromServer(url string) (headers map[string]string, body []byte, err error) {
 	res, err := http.Get(url)
 	if err != nil {
 		return
@@ -90,6 +178,11 @@ func main() {
 	flag.StringVar(&secr, "secret", "252c38cdb9f638908fab5df7263d156c759d590b1251785fa612e7874ee9bbcc32a61f8d795e7593ca31f8f47396c497b215e1abde6e947d7e25772f30115a7e", "The secret for HMAC check")
 	flag.Parse()
 	secret = []byte(secr)
+
+	// Start the cache
+	readChan = make(chan ReadRequest)
+	saveChan = make(chan SaveRequest)
+	go runCache()
 
 	// Routing
 	m := pat.New()
