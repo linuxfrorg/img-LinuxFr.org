@@ -7,12 +7,34 @@ import (
 	"flag"
 	"fmt"
 	"github.com/bmizerany/pat"
+	"io/ioutil"
 	"log"
 	"net/http"
 )
 
 // The secret for checking the HMAC on requests
 var secret []byte
+
+func fetchImage(url string) (headers map[string]string, body []byte, err error) {
+	res, err := http.Get(url)
+	if err != nil {
+		return
+	}
+
+	defer res.Body.Close()
+	body, err = ioutil.ReadAll(res.Body)
+	if err != nil {
+		return
+	}
+	res.Body.Close()
+
+	headers = make(map[string]string)
+	for key, values := range res.Header {
+		headers[key] = values[0]
+	}
+
+	return
+}
 
 // Decode the URL and compute the associated HMAC
 func decodeUrl(encoded_url string) (url []byte, actual string, err error) {
@@ -40,13 +62,19 @@ func Img(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid parameters", 400)
 		return
 	}
-	fmt.Printf("url = %s\n", url)
 	if expected != actual {
-		fmt.Printf("hmac = %s vs %s\n", expected, actual)
 		http.Error(w, "Invalid HMAC", 403)
 		return
 	}
-	http.NotFound(w, r)
+	headers, body, err := fetchImage(string(url))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	for key, value := range headers {
+		w.Header().Add(key, value)
+	}
+	w.Write(body)
 }
 
 // Returns 200 OK if the server is running (for monitoring)
