@@ -17,8 +17,8 @@ import (
 var secret []byte
 
 type CacheEntry struct {
-	headers map[string]string
-	body    []byte
+	contentType string
+	body        []byte
 }
 
 type ReadRequest struct {
@@ -68,42 +68,25 @@ func generateKeyForCache(s string) string {
 }
 
 // Fetch image from cache
-func fetchImageFromCache(key string) (headers map[string]string, body []byte, ok bool) {
+func fetchImageFromCache(key string) (contentType string, body []byte, ok bool) {
 	ch := make(chan *CacheEntry)
 	readChan <- ReadRequest{key, ch}
 	entry := <-ch
 	if ok = entry != nil; ok {
-		headers = entry.headers
+		contentType = entry.contentType
 		body = entry.body
 	}
 	return
 }
 
 // Save the body and the headers in cache
-func saveImageInCache(key string, headers map[string]string, body []byte) {
-	entry := CacheEntry{headers, body}
+func saveImageInCache(key string, contentType string, body []byte) {
+	entry := CacheEntry{contentType, body}
 	saveChan <- SaveRequest{key, &entry}
 }
 
-// Fetch image from cache if available, or from the server
-func fetchImage(url string) (headers map[string]string, body []byte, err error) {
-	key := generateKeyForCache(url)
-
-	headers, body, ok := fetchImageFromCache(key)
-	if ok {
-		return
-	}
-
-	headers, body, err = fetchImageFromServer(url)
-	if err == nil {
-		go saveImageInCache(key, headers, body)
-	}
-
-	return
-}
-
 // Fetch the image from the distant server
-func fetchImageFromServer(url string) (headers map[string]string, body []byte, err error) {
+func fetchImageFromServer(url string) (contentType string, body []byte, err error) {
 	res, err := http.Get(url)
 	if err != nil {
 		return
@@ -114,11 +97,24 @@ func fetchImageFromServer(url string) (headers map[string]string, body []byte, e
 	if err != nil {
 		return
 	}
-	res.Body.Close()
+	contentType = res.Header.Get("Content-Type")
+	fmt.Printf("Content-Type = %s\n", contentType)
 
-	headers = make(map[string]string)
-	for key, values := range res.Header {
-		headers[key] = values[0]
+	return
+}
+
+// Fetch image from cache if available, or from the server
+func fetchImage(url string) (contentType string, body []byte, err error) {
+	key := generateKeyForCache(url)
+
+	contentType, body, ok := fetchImageFromCache(key)
+	if ok {
+		return
+	}
+
+	contentType, body, err = fetchImageFromServer(url)
+	if err == nil {
+		go saveImageInCache(key, contentType, body)
 	}
 
 	return
@@ -154,14 +150,12 @@ func Img(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid HMAC", 403)
 		return
 	}
-	headers, body, err := fetchImage(string(url))
+	contentType, body, err := fetchImage(string(url))
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
-	for key, value := range headers {
-		w.Header().Add(key, value)
-	}
+	w.Header().Add("Content-Type", contentType)
 	w.Write(body)
 }
 
