@@ -21,45 +21,38 @@ type CacheEntry struct {
 	Body        []byte
 }
 
-type ReadRequest struct {
-	key string
-	ch  chan *CacheEntry
-}
-
-type SaveRequest struct {
-	key   string
-	entry *CacheEntry
-}
-
-var readChan chan ReadRequest
-var saveChan chan SaveRequest
-
 // The directory for caching files
 var directory string
 
 // The secret for checking the HMAC on requests
 var secret []byte
 
-// Read an entry of cache from the disk and send it to the chan
-func readEntryFromDisk(filename string, ch chan *CacheEntry) {
+// Fetch image from cache
+func fetchImageFromCache(filename string) (contentType string, body []byte, ok bool) {
+	ok = false
+
 	f, err := os.Open(filename)
 	if err != nil {
-		ch <- nil
 		return
 	}
 	defer f.Close()
 
-	entry := &CacheEntry{}
+	var entry CacheEntry
 	dec := gob.NewDecoder(f)
-	err = dec.Decode(entry)
+	err = dec.Decode(&entry)
 	if err != nil {
-		entry = nil
+		log.Printf("Error while decoding %s\n", filename)
+	} else {
+		contentType = entry.ContentType
+		body = entry.Body
+		ok = true
 	}
-	ch <- entry
+
+	return
 }
 
-// Save an entry of cache on the disk
-func saveEntryToDisk(filename string, entry *CacheEntry) {
+// Save the body and the headers in cache (on disk)
+func saveImageInCache(filename string, contentType string, body []byte) {
 	dirname := path.Dir(filename)
 	err := os.MkdirAll(dirname, 0755)
 	if err != nil {
@@ -68,34 +61,22 @@ func saveEntryToDisk(filename string, entry *CacheEntry) {
 
 	f, err := os.OpenFile(filename+".tmp", os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
+		log.Printf("Error while opening %s\n", filename)
 		return
 	}
 	defer f.Close()
 
 	enc := gob.NewEncoder(f)
-	err = enc.Encode(entry)
+	err = enc.Encode(CacheEntry{contentType, body})
 	if err != nil {
+		log.Printf("Error while encoding %s\n", filename)
 		os.Remove(filename + ".tmp")
 		return
 	}
 	err = os.Rename(filename+".tmp", filename)
 	if err != nil {
+		log.Printf("Error while renaming %s\n", filename)
 		os.Remove(filename + ".tmp")
-		return
-	}
-}
-
-// Run the cache in its own goroutine
-func runCache() {
-	for {
-		select {
-		case read := <-readChan:
-			filename := path.Join(directory, read.key)
-			go readEntryFromDisk(filename, read.ch)
-		case save := <-saveChan:
-			filename := path.Join(directory, save.key)
-			go saveEntryToDisk(filename, save.entry)
-		}
 	}
 }
 
@@ -106,25 +87,7 @@ func generateKeyForCache(s string) string {
 	key := h.Sum(nil)
 
 	// Use 3 levels of hasing to avoid having too many files in the same directory
-	return fmt.Sprintf("%x/%x/%x/%x", key[0:1], key[1:2], key[2:3], key[3:])
-}
-
-// Fetch image from cache
-func fetchImageFromCache(key string) (contentType string, body []byte, ok bool) {
-	ch := make(chan *CacheEntry)
-	readChan <- ReadRequest{key, ch}
-	entry := <-ch
-	if ok = entry != nil; ok {
-		contentType = entry.ContentType
-		body = entry.Body
-	}
-	return
-}
-
-// Save the body and the headers in cache
-func saveImageInCache(key string, contentType string, body []byte) {
-	entry := CacheEntry{contentType, body}
-	saveChan <- SaveRequest{key, &entry}
+	return fmt.Sprintf("%s/%x/%x/%x/%x", directory, key[0:1], key[1:2], key[2:3], key[3:])
 }
 
 // Fetch the image from the distant server
@@ -140,7 +103,7 @@ func fetchImageFromServer(url string) (contentType string, body []byte, err erro
 		return
 	}
 	contentType = res.Header.Get("Content-Type")
-	fmt.Printf("Content-Type = %s\n", contentType)
+	log.Printf("Fetch %s (%s)\n", url, contentType)
 
 	return
 }
@@ -185,10 +148,12 @@ func Img(w http.ResponseWriter, r *http.Request) {
 	encoded_url := r.URL.Query().Get(":encoded_url")
 	url, actual, err := decodeUrl(encoded_url)
 	if err != nil {
+		log.Printf("Invalid URL %s%s\n", encoded_url)
 		http.Error(w, "Invalid parameters", 400)
 		return
 	}
 	if expected != actual {
+		log.Printf("Invalid HMAC expected=%s actual=%s\n", expected, actual)
 		http.Error(w, "Invalid HMAC", 403)
 		return
 	}
@@ -216,11 +181,6 @@ func main() {
 	flag.Parse()
 	secret = []byte(secr)
 
-	// Start the cache
-	readChan = make(chan ReadRequest)
-	saveChan = make(chan SaveRequest)
-	go runCache()
-
 	// Routing
 	m := pat.New()
 	m.Get("/status", http.HandlerFunc(Status))
@@ -228,7 +188,7 @@ func main() {
 	http.Handle("/", m)
 
 	// Start the HTTP server
-	fmt.Printf("Listening on http://%s/\n", addr)
+	log.Printf("Listening on http://%s/\n", addr)
 	err := http.ListenAndServe(addr, nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
