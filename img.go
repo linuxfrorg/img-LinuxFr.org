@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/hmac"
 	"crypto/sha1"
+	"encoding/gob"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -11,14 +12,13 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"path"
 )
 
-// The secret for checking the HMAC on requests
-var secret []byte
-
 type CacheEntry struct {
-	contentType string
-	body        []byte
+	ContentType string
+	Body        []byte
 }
 
 type ReadRequest struct {
@@ -34,22 +34,67 @@ type SaveRequest struct {
 var readChan chan ReadRequest
 var saveChan chan SaveRequest
 
+// The directory for caching files
+var directory string
+
+// The secret for checking the HMAC on requests
+var secret []byte
+
+// Read an entry of cache from the disk and send it to the chan
+func readEntryFromDisk(filename string, ch chan *CacheEntry) {
+	f, err := os.Open(filename)
+	if err != nil {
+		ch <- nil
+		return
+	}
+	defer f.Close()
+
+	entry := &CacheEntry{}
+	dec := gob.NewDecoder(f)
+	err = dec.Decode(entry)
+	if err != nil {
+		entry = nil
+	}
+	ch <- entry
+}
+
+// Save an entry of cache on the disk
+func saveEntryToDisk(filename string, entry *CacheEntry) {
+	dirname := path.Dir(filename)
+	err := os.MkdirAll(dirname, 0755)
+	if err != nil {
+		return
+	}
+
+	f, err := os.OpenFile(filename+".tmp", os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	enc := gob.NewEncoder(f)
+	err = enc.Encode(entry)
+	if err != nil {
+		os.Remove(filename + ".tmp")
+		return
+	}
+	err = os.Rename(filename+".tmp", filename)
+	if err != nil {
+		os.Remove(filename + ".tmp")
+		return
+	}
+}
+
 // Run the cache in its own goroutine
 func runCache() {
-	// TODO don't use an in-memory cache, but a file-disk one
-	cache := make(map[string]CacheEntry)
-
 	for {
 		select {
 		case read := <-readChan:
-			entry, ok := cache[read.key]
-			if ok {
-				read.ch <- &entry
-			} else {
-				read.ch <- nil
-			}
+			filename := path.Join(directory, read.key)
+			go readEntryFromDisk(filename, read.ch)
 		case save := <-saveChan:
-			cache[save.key] = *save.entry
+			filename := path.Join(directory, save.key)
+			go saveEntryToDisk(filename, save.entry)
 		}
 	}
 }
@@ -60,11 +105,8 @@ func generateKeyForCache(s string) string {
 	io.WriteString(h, s)
 	key := h.Sum(nil)
 
-	// Use 2 levels of hasing to avoid having too many files in the same directory
-	key[3] = '/'
-	key[7] = '/'
-
-	return fmt.Sprintf("%x", key)
+	// Use 3 levels of hasing to avoid having too many files in the same directory
+	return fmt.Sprintf("%x/%x/%x/%x", key[0:1], key[1:2], key[2:3], key[3:])
 }
 
 // Fetch image from cache
@@ -73,8 +115,8 @@ func fetchImageFromCache(key string) (contentType string, body []byte, ok bool) 
 	readChan <- ReadRequest{key, ch}
 	entry := <-ch
 	if ok = entry != nil; ok {
-		contentType = entry.contentType
-		body = entry.body
+		contentType = entry.ContentType
+		body = entry.Body
 	}
 	return
 }
@@ -168,8 +210,9 @@ func main() {
 	// Parse the command-line
 	var addr string
 	var secr string
-	flag.StringVar(&addr, "addr", "127.0.0.1:8000", "Bind to this address:port")
-	flag.StringVar(&secr, "secret", "252c38cdb9f638908fab5df7263d156c759d590b1251785fa612e7874ee9bbcc32a61f8d795e7593ca31f8f47396c497b215e1abde6e947d7e25772f30115a7e", "The secret for HMAC check")
+	flag.StringVar(&addr, "a", "127.0.0.1:8000", "Bind to this address:port")
+	flag.StringVar(&secr, "s", "252c38cdb9f638908fab5df7263d156c759d590b1251785fa612e7874ee9bbcc32a61f8d795e7593ca31f8f47396c497b215e1abde6e947d7e25772f30115a7e", "The secret for HMAC check")
+	flag.StringVar(&directory, "d", "cache", "The directory for the caching files")
 	flag.Parse()
 	secret = []byte(secr)
 
