@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"encoding/gob"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"github.com/bmizerany/pat"
@@ -12,14 +13,19 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 )
 
+// An entry of cache
 type CacheEntry struct {
 	ContentType string
 	Body        []byte
 }
+
+// The maximal size for an image is 5MB
+const maxSize = 5 * (1 << 20)
 
 // The directory for caching files
 var directory string
@@ -91,9 +97,14 @@ func generateKeyForCache(s string) string {
 }
 
 // Fetch the image from the distant server
-func fetchImageFromServer(url string) (contentType string, body []byte, err error) {
-	res, err := http.Get(url)
+func fetchImageFromServer(uri string) (contentType string, body []byte, err error) {
+	res, err := http.Get(uri)
 	if err != nil {
+		return
+	}
+	if res.StatusCode != 200 {
+		log.Printf("Status code of %s is: %d\n", uri, res.StatusCode)
+		err = errors.New("Unexpected status code")
 		return
 	}
 
@@ -102,22 +113,32 @@ func fetchImageFromServer(url string) (contentType string, body []byte, err erro
 	if err != nil {
 		return
 	}
+	if res.ContentLength > maxSize {
+		log.Printf("Exceeded max size for %s: %d\n", uri, res.ContentLength)
+		err = errors.New("Exceeded max size")
+		return
+	}
 	contentType = res.Header.Get("Content-Type")
-	log.Printf("Fetch %s (%s)\n", url, contentType)
+	if contentType[0:5] != "image" {
+		log.Printf("%s has an invalid content-type: %s\n", uri, contentType)
+		err = errors.New("Invalid content-type")
+		return
+	}
+	log.Printf("Fetch %s (%s)\n", uri, contentType)
 
 	return
 }
 
 // Fetch image from cache if available, or from the server
-func fetchImage(url string) (contentType string, body []byte, err error) {
-	key := generateKeyForCache(url)
+func fetchImage(uri string) (contentType string, body []byte, err error) {
+	key := generateKeyForCache(uri)
 
 	contentType, body, ok := fetchImageFromCache(key)
 	if ok {
 		return
 	}
 
-	contentType, body, err = fetchImageFromServer(url)
+	contentType, body, err = fetchImageFromServer(uri)
 	if err == nil {
 		go saveImageInCache(key, contentType, body)
 	}
@@ -126,19 +147,20 @@ func fetchImage(url string) (contentType string, body []byte, err error) {
 }
 
 // Decode the URL and compute the associated HMAC
-func decodeUrl(encoded_url string) (url []byte, actual string, err error) {
-	url, err = hex.DecodeString(encoded_url)
+func decodeUrl(encoded_url string) (uri string, actual string, err error) {
+	chars, err := hex.DecodeString(encoded_url)
 	if err != nil {
 		return
 	}
 
 	h := hmac.New(sha1.New, secret)
-	_, err = h.Write(url)
+	_, err = h.Write(chars)
 	if err != nil {
 		return
 	}
 	actual = fmt.Sprintf("%x", h.Sum(nil))
 
+	uri = string(chars)
 	return
 }
 
@@ -146,9 +168,23 @@ func decodeUrl(encoded_url string) (url []byte, actual string, err error) {
 func Img(w http.ResponseWriter, r *http.Request) {
 	expected := r.URL.Query().Get(":hmac")
 	encoded_url := r.URL.Query().Get(":encoded_url")
-	url, actual, err := decodeUrl(encoded_url)
+	uri, actual, err := decodeUrl(encoded_url)
 	if err != nil {
-		log.Printf("Invalid URL %s%s\n", encoded_url)
+		log.Printf("Invalid URL %s\n", encoded_url)
+		http.Error(w, "Invalid parameters", 400)
+		return
+	}
+
+	// Check the validity of the URL
+	u, err := url.Parse(uri)
+	if err != nil {
+		log.Printf("Invalid URL %s\n", uri)
+		http.Error(w, "Invalid parameters", 400)
+		return
+	}
+	h := u.Host + "XXXXXXX" // Be sure to have enough chars to avoid out of bounds
+	if h[0:3] == "10." || h[0:4] == "127." || h[0:7] == "169.254" || h[0:7] == "192.168" {
+		log.Printf("Invalid IP %s\n", uri)
 		http.Error(w, "Invalid parameters", 400)
 		return
 	}
@@ -157,7 +193,8 @@ func Img(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid HMAC", 403)
 		return
 	}
-	contentType, body, err := fetchImage(string(url))
+
+	contentType, body, err := fetchImage(uri)
 	if err != nil {
 		http.NotFound(w, r)
 		return
