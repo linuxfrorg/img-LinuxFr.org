@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/gob"
 	"encoding/hex"
@@ -30,9 +29,6 @@ const maxSize = 5 * (1 << 20)
 
 // The directory for caching files
 var directory string
-
-// The secret for checking the HMAC on requests
-var secret []byte
 
 // Fetch image from cache
 func fetchImageFromCache(filename string) (contentType string, body []byte, ok bool) {
@@ -147,34 +143,16 @@ func fetchImage(uri string) (contentType string, body []byte, err error) {
 	return
 }
 
-// Decode the URL and compute the associated HMAC
-func decodeUrl(encoded_url string) (uri string, actual string, err error) {
-	chars, err := hex.DecodeString(encoded_url)
-	if err != nil {
-		return
-	}
-
-	h := hmac.New(sha1.New, secret)
-	_, err = h.Write(chars)
-	if err != nil {
-		return
-	}
-	actual = fmt.Sprintf("%x", h.Sum(nil))
-
-	uri = string(chars)
-	return
-}
-
 // Fetch the image from the URL (or cache) and respond with it
 func Img(w http.ResponseWriter, r *http.Request) {
-	expected := r.URL.Query().Get(":hmac")
 	encoded_url := r.URL.Query().Get(":encoded_url")
-	uri, actual, err := decodeUrl(encoded_url)
+	chars, err := hex.DecodeString(encoded_url)
 	if err != nil {
 		log.Printf("Invalid URL %s\n", encoded_url)
 		http.Error(w, "Invalid parameters", 400)
 		return
 	}
+	uri := string(chars)
 
 	// Check the validity of the URL
 	u, err := url.Parse(uri)
@@ -187,11 +165,6 @@ func Img(w http.ResponseWriter, r *http.Request) {
 	if h[0:3] == "10." || h[0:4] == "127." || h[0:7] == "169.254" || h[0:7] == "192.168" {
 		log.Printf("Invalid IP %s\n", uri)
 		http.Error(w, "Invalid parameters", 400)
-		return
-	}
-	if expected != actual {
-		log.Printf("Invalid HMAC expected=%s actual=%s\n", expected, actual)
-		http.Error(w, "Invalid HMAC", 403)
 		return
 	}
 
@@ -212,14 +185,11 @@ func Status(w http.ResponseWriter, r *http.Request) {
 func main() {
 	// Parse the command-line
 	var addr string
-	var secr string
 	var logs string
 	flag.StringVar(&addr, "a", "127.0.0.1:8000", "Bind to this address:port")
-	flag.StringVar(&secr, "s", "252c38cdb9f638908fab5df7263d156c759d590b1251785fa612e7874ee9bbcc32a61f8d795e7593ca31f8f47396c497b215e1abde6e947d7e25772f30115a7e", "The secret for HMAC check")
 	flag.StringVar(&logs, "l", "-", "Use this file for logs")
 	flag.StringVar(&directory, "d", "cache", "The directory for the caching files")
 	flag.Parse()
-	secret = []byte(secr)
 
 	// Logging
 	if logs != "-" {
@@ -234,7 +204,7 @@ func main() {
 	// Routing
 	m := pat.New()
 	m.Get("/status", http.HandlerFunc(Status))
-	m.Get("/img/:hmac/:encoded_url", http.HandlerFunc(Img))
+	m.Get("/img/:encoded_url", http.HandlerFunc(Img))
 	http.Handle("/", m)
 
 	// Start the HTTP server
