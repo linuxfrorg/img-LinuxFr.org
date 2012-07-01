@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"syscall"
 )
 
 // An entry of cache
@@ -212,11 +213,23 @@ func main() {
 	// Parse the command-line
 	var addr string
 	var secr string
+	var logs string
 	flag.StringVar(&addr, "a", "127.0.0.1:8000", "Bind to this address:port")
 	flag.StringVar(&secr, "s", "252c38cdb9f638908fab5df7263d156c759d590b1251785fa612e7874ee9bbcc32a61f8d795e7593ca31f8f47396c497b215e1abde6e947d7e25772f30115a7e", "The secret for HMAC check")
+	flag.StringVar(&logs, "l", "-", "Use this file for logs")
 	flag.StringVar(&directory, "d", "cache", "The directory for the caching files")
 	flag.Parse()
 	secret = []byte(secr)
+
+	// Logging
+	if logs != "-" {
+		f, err := os.OpenFile(logs, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+		if err != nil {
+			log.Fatal("OpenFile: ", err)
+		}
+		syscall.Dup2(int(f.Fd()), int(os.Stdout.Fd()))
+		syscall.Dup2(int(f.Fd()), int(os.Stderr.Fd()))
+	}
 
 	// Routing
 	m := pat.New()

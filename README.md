@@ -24,7 +24,7 @@ How to use it?
 
     $ go get github.com/bmizerany/pat
     $ go get github.com/nono/img-LinuxFr.org
-    $ img-LinuxFr.org [-a addr] [-s secret] [-d dir]
+    $ img-LinuxFr.org [-a addr] [-s secret] [-l log] [-d dir]
 
 
 Why don't you use camo?
