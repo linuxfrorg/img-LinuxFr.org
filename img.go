@@ -1,13 +1,13 @@
 package main
 
 import (
-	"code.google.com/p/tcgl/redis"
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
 	"github.com/bmizerany/pat"
+	"github.com/fzzbt/radix/redis"
 	"io"
 	"io/ioutil"
 	"log"
@@ -26,30 +26,19 @@ const maxSize = 5 * (1 << 20)
 var directory string
 
 // The connection to redis
-var connection *redis.Database
+var connection *redis.Client
 
 func urlStatus(uri string) error {
-	res := connection.Command("hexists", "img/"+uri, "created_at")
-	if !res.IsOK() {
-		return res.Error()
-	}
-
-	ok, err := res.ValueAsBool()
+	ok, err := connection.Hexists("img/"+uri, "created_at").Bool()
 	if err != nil {
 		return err
 	}
-
 	if !ok {
 		return errors.New("Invalid URL")
 	}
 
-	res = connection.Command("get", "img/err/"+uri)
-	if !res.IsOK() {
-		return nil
-	}
-	str := res.ValueAsString()
+	str, err := connection.Get("img/err/" + uri).Str()
 	if err == nil {
-		fmt.Printf("*** str = %s ***\n", str)
 		return errors.New(str)
 	}
 
@@ -70,19 +59,15 @@ func generateKeyForCache(s string) string {
 func fetchImageFromCache(uri string) (contentType string, body []byte, ok bool) {
 	ok = false
 
-	res := connection.Command("hget", "img/"+uri, "type")
-	if !res.IsOK() {
-		return
-	}
-	contentType = res.ValueAsString()
-
-	filename := generateKeyForCache(uri)
-	body, err := ioutil.ReadFile(filename)
+	contentType, err := connection.Hget("img/"+uri, "type").Str()
 	if err != nil {
 		return
 	}
 
-	ok = true
+	filename := generateKeyForCache(uri)
+	body, err = ioutil.ReadFile(filename)
+	ok = err == nil
+
 	return
 }
 
@@ -104,14 +89,14 @@ func saveImageInCache(uri string, contentType string, body []byte) {
 		}
 
 		// And other infos in redis
-		connection.Command("hset", "img/"+uri, "type", contentType)
+		connection.Hset("img/"+uri, "type", contentType)
 	}()
 }
 
 func saveErrorInCache(uri string, err error) {
 	go func() {
-		connection.Command("set", "img/err/"+uri, err.Error())
-		connection.Command("expire", "img/err/"+uri, 600)
+		connection.Set("img/err/"+uri, err.Error())
+		connection.Expire("img/err/"+uri, 600)
 	}()
 }
 
@@ -222,8 +207,13 @@ func main() {
 	if len(parts) >= 2 {
 		db, _ = strconv.Atoi(parts[1])
 	}
-	cfg := redis.Configuration{Database: db, Address: host, PoolSize: 4}
-	connection = redis.Connect(cfg)
+	cfg := redis.Config{Database: db, Address: host, PoolCapacity: 4}
+	c, err := redis.NewClient(cfg)
+	if err != nil {
+		log.Fatal("Redis: ", err)
+	}
+	defer c.Close()
+	connection = c
 
 	// Routing
 	m := pat.New()
@@ -233,7 +223,7 @@ func main() {
 
 	// Start the HTTP server
 	log.Printf("Listening on http://%s/\n", addr)
-	err := http.ListenAndServe(addr, nil)
+	err = http.ListenAndServe(addr, nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
