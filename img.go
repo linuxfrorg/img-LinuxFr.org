@@ -2,27 +2,22 @@ package main
 
 import (
 	"crypto/sha1"
-	"encoding/gob"
 	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
 	"github.com/bmizerany/pat"
+	"github.com/fzzbt/radix/redis"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"path"
+	"strconv"
+	"strings"
 	"syscall"
 )
-
-// An entry of cache
-type CacheEntry struct {
-	ContentType string
-	Body        []byte
-}
 
 // The maximal size for an image is 5MB
 const maxSize = 5 * (1 << 20)
@@ -30,58 +25,8 @@ const maxSize = 5 * (1 << 20)
 // The directory for caching files
 var directory string
 
-// Fetch image from cache
-func fetchImageFromCache(filename string) (contentType string, body []byte, ok bool) {
-	ok = false
-
-	f, err := os.Open(filename)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-
-	var entry CacheEntry
-	dec := gob.NewDecoder(f)
-	err = dec.Decode(&entry)
-	if err != nil {
-		log.Printf("Error while decoding %s\n", filename)
-	} else {
-		contentType = entry.ContentType
-		body = entry.Body
-		ok = true
-	}
-
-	return
-}
-
-// Save the body and the headers in cache (on disk)
-func saveImageInCache(filename string, contentType string, body []byte) {
-	dirname := path.Dir(filename)
-	err := os.MkdirAll(dirname, 0755)
-	if err != nil {
-		return
-	}
-
-	f, err := os.OpenFile(filename+".tmp", os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
-	if err != nil {
-		log.Printf("Error while opening %s\n", filename)
-		return
-	}
-	defer f.Close()
-
-	enc := gob.NewEncoder(f)
-	err = enc.Encode(CacheEntry{contentType, body})
-	if err != nil {
-		log.Printf("Error while encoding %s\n", filename)
-		os.Remove(filename + ".tmp")
-		return
-	}
-	err = os.Rename(filename+".tmp", filename)
-	if err != nil {
-		log.Printf("Error while renaming %s\n", filename)
-		os.Remove(filename + ".tmp")
-	}
-}
+// The connection to redis
+var connection *redis.Client
 
 // Generate a key for cache from a string
 func generateKeyForCache(s string) string {
@@ -91,6 +36,46 @@ func generateKeyForCache(s string) string {
 
 	// Use 3 levels of hasing to avoid having too many files in the same directory
 	return fmt.Sprintf("%s/%x/%x/%x/%x", directory, key[0:1], key[1:2], key[2:3], key[3:])
+}
+
+// Fetch image from cache
+func fetchImageFromCache(uri string) (contentType string, body []byte, ok bool) {
+	ok = false
+
+	reply := connection.Hget("img/"+uri, "type")
+	if reply.Err != nil {
+		return
+	}
+	contentType, _ = reply.Str()
+
+	filename := generateKeyForCache(uri)
+	body, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return
+	}
+
+	ok = true
+	return
+}
+
+// Save the body and the content-type header in cache
+func saveImageInCache(uri string, contentType string, body []byte) {
+	filename := generateKeyForCache(uri)
+	dirname := path.Dir(filename)
+	err := os.MkdirAll(dirname, 0755)
+	if err != nil {
+		return
+	}
+
+	// Save the body on disk
+	err = ioutil.WriteFile(filename, body, 0644)
+	if err != nil {
+		log.Printf("Error while writing %s\n", filename)
+		return
+	}
+
+	// And other infos in redis
+	connection.Hset("img/"+uri, "type", contentType)
 }
 
 // Fetch the image from the distant server
@@ -128,22 +113,20 @@ func fetchImageFromServer(uri string) (contentType string, body []byte, err erro
 
 // Fetch image from cache if available, or from the server
 func fetchImage(uri string) (contentType string, body []byte, err error) {
-	key := generateKeyForCache(uri)
-
-	contentType, body, ok := fetchImageFromCache(key)
+	contentType, body, ok := fetchImageFromCache(uri)
 	if ok {
 		return
 	}
 
 	contentType, body, err = fetchImageFromServer(uri)
 	if err == nil {
-		go saveImageInCache(key, contentType, body)
+		go saveImageInCache(uri, contentType, body)
 	}
 
 	return
 }
 
-// Fetch the image from the URL (or cache) and respond with it
+// Receive an HTTP request for an image and respond with it
 func Img(w http.ResponseWriter, r *http.Request) {
 	encoded_url := r.URL.Query().Get(":encoded_url")
 	chars, err := hex.DecodeString(encoded_url)
@@ -153,20 +136,6 @@ func Img(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	uri := string(chars)
-
-	// Check the validity of the URL
-	u, err := url.Parse(uri)
-	if err != nil {
-		log.Printf("Invalid URL %s\n", uri)
-		http.Error(w, "Invalid parameters", 400)
-		return
-	}
-	h := u.Host + "XXXXXXX" // Be sure to have enough chars to avoid out of bounds
-	if h[0:3] == "10." || h[0:4] == "127." || h[0:7] == "169.254" || h[0:7] == "192.168" {
-		log.Printf("Invalid IP %s\n", uri)
-		http.Error(w, "Invalid parameters", 400)
-		return
-	}
 
 	contentType, body, err := fetchImage(uri)
 	if err != nil {
@@ -186,8 +155,10 @@ func main() {
 	// Parse the command-line
 	var addr string
 	var logs string
+	var conn string
 	flag.StringVar(&addr, "a", "127.0.0.1:8000", "Bind to this address:port")
 	flag.StringVar(&logs, "l", "-", "Use this file for logs")
+	flag.StringVar(&conn, "-r", "localhost:6379/0", "The redis database to use for caching meta")
 	flag.StringVar(&directory, "d", "cache", "The directory for the caching files")
 	flag.Parse()
 
@@ -201,6 +172,19 @@ func main() {
 		syscall.Dup2(int(f.Fd()), int(os.Stderr.Fd()))
 	}
 
+	// Redis
+	parts := strings.Split(conn, "/")
+	host := parts[0]
+	db := 0
+	if len(parts) >= 2 {
+		db, _ = strconv.Atoi(parts[1])
+	}
+	connection, err := redis.NewClient(redis.Config{Database: db, Address: host})
+	if err != nil {
+		log.Fatal("Redis: ", err)
+	}
+	defer connection.Close()
+
 	// Routing
 	m := pat.New()
 	m.Get("/status", http.HandlerFunc(Status))
@@ -209,7 +193,7 @@ func main() {
 
 	// Start the HTTP server
 	log.Printf("Listening on http://%s/\n", addr)
-	err := http.ListenAndServe(addr, nil)
+	err = http.ListenAndServe(addr, nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}

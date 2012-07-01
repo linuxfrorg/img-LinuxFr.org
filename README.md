@@ -23,8 +23,13 @@ How to use it?
 [Install Go 1](http://golang.org/doc/install) and don't forget to set `$GOROOT`
 
     $ go get github.com/bmizerany/pat
+    $ go get github.com/fzzbt/radix/redis
     $ go get github.com/nono/img-LinuxFr.org
-    $ img-LinuxFr.org [-a addr] [-s secret] [-l log] [-d dir]
+    $ img-LinuxFr.org [-a addr] [-r redis] [-l log] [-d dir]
+
+And, to display the help:
+
+    $ img-LinuxFr.org -h
 
 
 Why don't you use camo?
@@ -37,8 +42,9 @@ instead of using it for several reasons:
 - It lacks some feature and particulary caching!
 - It runs with a legacy version of node.js, which is not very friendly for our
   sysadmins.
-- I plan to add extend it for other usages in the future, and I prefer coding
-  in golang than in nodejs.
+- I plan to extend it for other usages in the future, and I prefer coding in
+  golang than in nodejs.
+- And it's a fun component to recode :p
 
 
 See also
