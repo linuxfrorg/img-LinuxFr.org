@@ -43,6 +43,16 @@ func urlStatus(uri string) error {
 		return errors.New("Invalid URL")
 	}
 
+	res = connection.Command("get", "img/err/"+uri)
+	if !res.IsOK() {
+		return nil
+	}
+	str := res.ValueAsString()
+	if err == nil {
+		fmt.Printf("*** str = %s ***\n", str)
+		return errors.New(str)
+	}
+
 	return nil
 }
 
@@ -64,7 +74,7 @@ func fetchImageFromCache(uri string) (contentType string, body []byte, ok bool) 
 	if !res.IsOK() {
 		return
 	}
-	contentType = res.String()
+	contentType = res.ValueAsString()
 
 	filename := generateKeyForCache(uri)
 	body, err := ioutil.ReadFile(filename)
@@ -78,22 +88,31 @@ func fetchImageFromCache(uri string) (contentType string, body []byte, ok bool) 
 
 // Save the body and the content-type header in cache
 func saveImageInCache(uri string, contentType string, body []byte) {
-	filename := generateKeyForCache(uri)
-	dirname := path.Dir(filename)
-	err := os.MkdirAll(dirname, 0755)
-	if err != nil {
-		return
-	}
+	go func() {
+		filename := generateKeyForCache(uri)
+		dirname := path.Dir(filename)
+		err := os.MkdirAll(dirname, 0755)
+		if err != nil {
+			return
+		}
 
-	// Save the body on disk
-	err = ioutil.WriteFile(filename, body, 0644)
-	if err != nil {
-		log.Printf("Error while writing %s\n", filename)
-		return
-	}
+		// Save the body on disk
+		err = ioutil.WriteFile(filename, body, 0644)
+		if err != nil {
+			log.Printf("Error while writing %s\n", filename)
+			return
+		}
 
-	// And other infos in redis
-	connection.Command("hset", "img/"+uri, "type", contentType)
+		// And other infos in redis
+		connection.Command("hset", "img/"+uri, "type", contentType)
+	}()
+}
+
+func saveErrorInCache(uri string, err error) {
+	go func() {
+		connection.Command("set", "img/err/"+uri, err.Error())
+		connection.Command("expire", "img/err/"+uri, 600)
+	}()
 }
 
 // Fetch the image from the distant server
@@ -105,6 +124,7 @@ func fetchImageFromServer(uri string) (contentType string, body []byte, err erro
 	if res.StatusCode != 200 {
 		log.Printf("Status code of %s is: %d\n", uri, res.StatusCode)
 		err = errors.New("Unexpected status code")
+		saveErrorInCache(uri, err)
 		return
 	}
 
@@ -113,22 +133,23 @@ func fetchImageFromServer(uri string) (contentType string, body []byte, err erro
 	if err != nil {
 		return
 	}
-	// TODO keep errors in cache with a small TTL
 	if res.ContentLength > maxSize {
 		log.Printf("Exceeded max size for %s: %d\n", uri, res.ContentLength)
 		err = errors.New("Exceeded max size")
+		saveErrorInCache(uri, err)
 		return
 	}
 	contentType = res.Header.Get("Content-Type")
 	if contentType[0:5] != "image" {
 		log.Printf("%s has an invalid content-type: %s\n", uri, contentType)
 		err = errors.New("Invalid content-type")
+		saveErrorInCache(uri, err)
 		return
 	}
 	log.Printf("Fetch %s (%s)\n", uri, contentType)
 
 	if urlStatus(uri) == nil {
-		go saveImageInCache(uri, contentType, body)
+		saveImageInCache(uri, contentType, body)
 	}
 	return
 }
@@ -201,7 +222,7 @@ func main() {
 	if len(parts) >= 2 {
 		db, _ = strconv.Atoi(parts[1])
 	}
-	cfg := redis.Configuration{Database: db, Address: host, PoolSize: 4, LogCommands: false}
+	cfg := redis.Configuration{Database: db, Address: host, PoolSize: 4}
 	connection = redis.Connect(cfg)
 
 	// Routing
