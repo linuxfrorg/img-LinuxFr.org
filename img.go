@@ -28,6 +28,24 @@ var directory string
 // The connection to redis
 var connection *redis.Database
 
+func urlStatus(uri string) error {
+	res := connection.Command("hexists", "img/"+uri, "created_at")
+	if !res.IsOK() {
+		return res.Error()
+	}
+
+	ok, err := res.ValueAsBool()
+	if err != nil {
+		return err
+	}
+
+	if !ok {
+		return errors.New("Invalid URL")
+	}
+
+	return nil
+}
+
 // Generate a key for cache from a string
 func generateKeyForCache(s string) string {
 	h := sha1.New()
@@ -95,6 +113,7 @@ func fetchImageFromServer(uri string) (contentType string, body []byte, err erro
 	if err != nil {
 		return
 	}
+	// TODO keep errors in cache with a small TTL
 	if res.ContentLength > maxSize {
 		log.Printf("Exceeded max size for %s: %d\n", uri, res.ContentLength)
 		err = errors.New("Exceeded max size")
@@ -108,19 +127,22 @@ func fetchImageFromServer(uri string) (contentType string, body []byte, err erro
 	}
 	log.Printf("Fetch %s (%s)\n", uri, contentType)
 
+	if urlStatus(uri) == nil {
+		go saveImageInCache(uri, contentType, body)
+	}
 	return
 }
 
 // Fetch image from cache if available, or from the server
 func fetchImage(uri string) (contentType string, body []byte, err error) {
-	contentType, body, ok := fetchImageFromCache(uri)
-	if ok {
+	err = urlStatus(uri)
+	if err != nil {
 		return
 	}
 
-	contentType, body, err = fetchImageFromServer(uri)
-	if err == nil {
-		go saveImageInCache(uri, contentType, body)
+	contentType, body, ok := fetchImageFromCache(uri)
+	if !ok {
+		contentType, body, err = fetchImageFromServer(uri)
 	}
 
 	return
