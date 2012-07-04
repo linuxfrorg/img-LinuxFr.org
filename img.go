@@ -186,7 +186,7 @@ func main() {
 	var conn string
 	flag.StringVar(&addr, "a", "127.0.0.1:8000", "Bind to this address:port")
 	flag.StringVar(&logs, "l", "-", "Use this file for logs")
-	flag.StringVar(&conn, "-r", "localhost:6379/0", "The redis database to use for caching meta")
+	flag.StringVar(&conn, "r", "localhost:6379/0", "The redis database to use for caching meta")
 	flag.StringVar(&directory, "d", "cache", "The directory for the caching files")
 	flag.Parse()
 

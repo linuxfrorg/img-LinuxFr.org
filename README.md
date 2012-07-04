@@ -24,7 +24,7 @@ How to use it?
 
     $ go get github.com/bmizerany/pat
     $ go get github.com/fzzbt/radix/redis
-    $ go get github.com/nono/img-LinuxFr.org
+    $ go get -u github.com/nono/img-LinuxFr.org
     $ img-LinuxFr.org [-a addr] [-r redis] [-l log] [-d dir]
 
 And, to display the help:
