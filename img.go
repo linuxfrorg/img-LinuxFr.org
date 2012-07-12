@@ -208,12 +208,8 @@ func main() {
 		db, _ = strconv.Atoi(parts[1])
 	}
 	cfg := redis.Config{Database: db, Address: host, PoolCapacity: 4}
-	c, err := redis.NewClient(cfg)
-	if err != nil {
-		log.Fatal("Redis: ", err)
-	}
-	defer c.Close()
-	connection = c
+	connection = redis.NewClient(cfg)
+	defer connection.Close()
 
 	// Routing
 	m := pat.New()
@@ -223,7 +219,7 @@ func main() {
 
 	// Start the HTTP server
 	log.Printf("Listening on http://%s/\n", addr)
-	err = http.ListenAndServe(addr, nil)
+	err := http.ListenAndServe(addr, nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}

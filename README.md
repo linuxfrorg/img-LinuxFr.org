@@ -22,8 +22,6 @@ How to use it?
 
 [Install Go 1](http://golang.org/doc/install) and don't forget to set `$GOROOT`
 
-    $ go get github.com/bmizerany/pat
-    $ go get github.com/fzzbt/radix/redis
     $ go get -u github.com/nono/img-LinuxFr.org
     $ img-LinuxFr.org [-a addr] [-r redis] [-l log] [-d dir]
 
