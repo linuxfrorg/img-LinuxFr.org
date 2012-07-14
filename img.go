@@ -17,7 +17,15 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
+
+// HTTP headers struct
+type Headers struct {
+	contentType  string
+	lastModified string
+	cacheControl string
+}
 
 // The maximal size for an image is 5MB
 const maxSize = 5 * (1 << 20)
@@ -56,7 +64,7 @@ func generateKeyForCache(s string) string {
 }
 
 // Fetch image from cache
-func fetchImageFromCache(uri string) (contentType string, body []byte, ok bool) {
+func fetchImageFromCache(uri string) (headers Headers, body []byte, ok bool) {
 	ok = false
 
 	contentType, err := connection.Hget("img/"+uri, "type").Str()
@@ -65,6 +73,14 @@ func fetchImageFromCache(uri string) (contentType string, body []byte, ok bool) 
 	}
 
 	filename := generateKeyForCache(uri)
+	stat, err := os.Stat(filename)
+	if err != nil {
+		return
+	}
+
+	headers.contentType = contentType
+	headers.lastModified = stat.ModTime().Format(time.RFC1123)
+
 	body, err = ioutil.ReadFile(filename)
 	ok = err == nil
 
@@ -72,7 +88,7 @@ func fetchImageFromCache(uri string) (contentType string, body []byte, ok bool) 
 }
 
 // Save the body and the content-type header in cache
-func saveImageInCache(uri string, contentType string, body []byte) {
+func saveImageInCache(uri string, headers Headers, body []byte) {
 	go func() {
 		filename := generateKeyForCache(uri)
 		dirname := path.Dir(filename)
@@ -89,7 +105,7 @@ func saveImageInCache(uri string, contentType string, body []byte) {
 		}
 
 		// And other infos in redis
-		connection.Hset("img/"+uri, "type", contentType)
+		connection.Hset("img/"+uri, "type", headers.contentType)
 	}()
 }
 
@@ -101,7 +117,7 @@ func saveErrorInCache(uri string, err error) {
 }
 
 // Fetch the image from the distant server
-func fetchImageFromServer(uri string) (contentType string, body []byte, err error) {
+func fetchImageFromServer(uri string) (headers Headers, body []byte, err error) {
 	res, err := http.Get(uri)
 	if err != nil {
 		return
@@ -124,7 +140,7 @@ func fetchImageFromServer(uri string) (contentType string, body []byte, err erro
 		saveErrorInCache(uri, err)
 		return
 	}
-	contentType = res.Header.Get("Content-Type")
+	contentType := res.Header.Get("Content-Type")
 	if contentType[0:5] != "image" {
 		log.Printf("%s has an invalid content-type: %s\n", uri, contentType)
 		err = errors.New("Invalid content-type")
@@ -133,23 +149,26 @@ func fetchImageFromServer(uri string) (contentType string, body []byte, err erro
 	}
 	log.Printf("Fetch %s (%s)\n", uri, contentType)
 
+	headers.contentType = contentType
+	headers.lastModified = time.Now().Format(time.RFC1123)
 	if urlStatus(uri) == nil {
-		saveImageInCache(uri, contentType, body)
+		saveImageInCache(uri, headers, body)
 	}
 	return
 }
 
 // Fetch image from cache if available, or from the server
-func fetchImage(uri string) (contentType string, body []byte, err error) {
+func fetchImage(uri string) (headers Headers, body []byte, err error) {
 	err = urlStatus(uri)
 	if err != nil {
 		return
 	}
 
-	contentType, body, ok := fetchImageFromCache(uri)
+	headers, body, ok := fetchImageFromCache(uri)
 	if !ok {
-		contentType, body, err = fetchImageFromServer(uri)
+		headers, body, err = fetchImageFromServer(uri)
 	}
+	headers.cacheControl = "public, max-age=600"
 
 	return
 }
@@ -165,12 +184,18 @@ func Img(w http.ResponseWriter, r *http.Request) {
 	}
 	uri := string(chars)
 
-	contentType, body, err := fetchImage(uri)
+	headers, body, err := fetchImage(uri)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
-	w.Header().Add("Content-Type", contentType)
+	if headers.lastModified == r.Header.Get("If-Modified-Since") {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	w.Header().Add("Content-Type", headers.contentType)
+	w.Header().Add("Last-Modified", headers.lastModified)
+	w.Header().Add("Cache-Control", headers.cacheControl)
 	w.Write(body)
 }
 
