@@ -84,6 +84,11 @@ func fetchImageFromCache(uri string) (headers Headers, body []byte, ok bool) {
 	body, err = ioutil.ReadFile(filename)
 	ok = err == nil
 
+	present, err := connection.Exists("img/updated/" + uri).Bool()
+	if err == nil && !present {
+		go fetchImageFromServer(uri)
+	}
+
 	return
 }
 
@@ -106,6 +111,8 @@ func saveImageInCache(uri string, headers Headers, body []byte) {
 
 		// And other infos in redis
 		connection.Hset("img/"+uri, "type", headers.contentType)
+		connection.Set("img/updated/"+uri, headers.lastModified)
+		connection.Expire("img/updated/"+uri, 600)
 	}()
 }
 
