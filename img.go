@@ -214,6 +214,7 @@ func main() {
 	// Routing
 	m := pat.New()
 	m.Get("/status", http.HandlerFunc(Status))
+	m.Get("/img/:encoded_url/:filename", http.HandlerFunc(Img))
 	m.Get("/img/:encoded_url", http.HandlerFunc(Img))
 	http.Handle("/", m)
 
