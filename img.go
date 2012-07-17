@@ -27,6 +27,9 @@ type Headers struct {
 	cacheControl string
 }
 
+// The URL for the default avatar
+const defaultAvatarUrl = "//linuxfr.org/images/default-avatar.png"
+
 // The maximal size for an image is 5MB
 const maxSize = 5 * (1 << 20)
 
@@ -36,6 +39,7 @@ var directory string
 // The connection to redis
 var connection *redis.Client
 
+// Check if an URL is valid and not temporary in error
 func urlStatus(uri string) error {
 	ok, err := connection.Hexists("img/"+uri, "created_at").Bool()
 	if err != nil {
@@ -116,6 +120,7 @@ func saveImageInCache(uri string, headers Headers, body []byte) {
 	}()
 }
 
+// Save the error in redis for 10 minutes
 func saveErrorInCache(uri string, err error) {
 	go func() {
 		connection.Set("img/err/"+uri, err.Error())
@@ -180,8 +185,8 @@ func fetchImage(uri string) (headers Headers, body []byte, err error) {
 	return
 }
 
-// Receive an HTTP request for an image and respond with it
-func Img(w http.ResponseWriter, r *http.Request) {
+// Receive an HTTP request, fetch the image and respond with it
+func Image(w http.ResponseWriter, r *http.Request, fn func()) {
 	encoded_url := r.URL.Query().Get(":encoded_url")
 	chars, err := hex.DecodeString(encoded_url)
 	if err != nil {
@@ -193,7 +198,7 @@ func Img(w http.ResponseWriter, r *http.Request) {
 
 	headers, body, err := fetchImage(uri)
 	if err != nil {
-		http.NotFound(w, r)
+		fn()
 		return
 	}
 	if headers.lastModified == r.Header.Get("If-Modified-Since") {
@@ -204,6 +209,23 @@ func Img(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Last-Modified", headers.lastModified)
 	w.Header().Add("Cache-Control", headers.cacheControl)
 	w.Write(body)
+}
+
+// Receive an HTTP request for an image and respond with it
+func Img(w http.ResponseWriter, r *http.Request) {
+	fn := func() {
+		http.NotFound(w, r)
+	}
+	Image(w, r, fn)
+}
+
+// Receive an HTTP request for an avatar and respond with it
+func Avatar(w http.ResponseWriter, r *http.Request) {
+	fn := func() {
+		w.Header().Set("Location", defaultAvatarUrl)
+		w.WriteHeader(http.StatusFound)
+	}
+	Image(w, r, fn)
 }
 
 // Returns 200 OK if the server is running (for monitoring)
@@ -248,6 +270,8 @@ func main() {
 	m.Get("/status", http.HandlerFunc(Status))
 	m.Get("/img/:encoded_url/:filename", http.HandlerFunc(Img))
 	m.Get("/img/:encoded_url", http.HandlerFunc(Img))
+	m.Get("/avatars/:encoded_url/:filename", http.HandlerFunc(Avatar))
+	m.Get("/avatars/:encoded_url", http.HandlerFunc(Avatar))
 	http.Handle("/", m)
 
 	// Start the HTTP server
