@@ -18,6 +18,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"crypto/tls"
 )
 
 // HTTP headers struct
@@ -130,7 +131,11 @@ func saveErrorInCache(uri string, err error) {
 
 // Fetch the image from the distant server
 func fetchImageFromServer(uri string) (headers Headers, body []byte, err error) {
-	res, err := http.Get(uri)
+	// Accepts any certificate in HTTPS
+	cfg := &tls.Config{InsecureSkipVerify: true}
+	tr := &http.Transport{TLSClientConfig: cfg}
+	client := &http.Client{Transport: tr}
+	res, err := client.Get(uri)
 	if err != nil {
 		return
 	}
