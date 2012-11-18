@@ -266,7 +266,9 @@ func main() {
 	if len(parts) >= 2 {
 		db, _ = strconv.Atoi(parts[1])
 	}
-	cfg := redis.Config{Database: db, Address: host, PoolCapacity: 4}
+	cfg := redis.DefaultConfig()
+	cfg.Database = db
+	cfg.Address = host
 	connection = redis.NewClient(cfg)
 	defer connection.Close()
 
