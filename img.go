@@ -73,6 +73,13 @@ func generateKeyForCache(s string) string {
 	return fmt.Sprintf("%s/%x/%x/%x/%x", directory, key[0:1], key[1:2], key[2:3], key[3:])
 }
 
+// Generate a key for cache from a string
+func generateChecksumForCache(body []byte) string {
+	h := sha1.New()
+	h.Write(body)
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
 // Fetch image from cache
 func fetchImageFromCache(uri string) (headers Headers, body []byte, ok bool) {
 	ok = false
@@ -105,9 +112,15 @@ func fetchImageFromCache(uri string) (headers Headers, body []byte, ok bool) {
 // Save the body and the content-type header in cache
 func saveImageInCache(uri string, headers Headers, body []byte) {
 	go func() {
+		checksum := generateChecksumForCache(body)
+		was, err := connection.Hget("img/"+uri, "checksum").Str()
+		if err == nil && checksum == was {
+			return
+		}
+
 		filename := generateKeyForCache(uri)
 		dirname := path.Dir(filename)
-		err := os.MkdirAll(dirname, 0755)
+		err = os.MkdirAll(dirname, 0755)
 		if err != nil {
 			return
 		}
@@ -121,6 +134,7 @@ func saveImageInCache(uri string, headers Headers, body []byte) {
 
 		// And other infos in redis
 		connection.Hset("img/"+uri, "type", headers.contentType)
+		connection.Hset("img/"+uri, "checksum", checksum)
 		connection.Set("img/updated/"+uri, headers.lastModified)
 		connection.Expire("img/updated/"+uri, 600)
 	}()
