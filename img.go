@@ -115,6 +115,8 @@ func saveImageInCache(uri string, headers Headers, body []byte) {
 		checksum := generateChecksumForCache(body)
 		was, err := connection.Hget("img/"+uri, "checksum").Str()
 		if err == nil && checksum == was {
+			connection.Set("img/updated/"+uri, headers.lastModified)
+			connection.Expire("img/updated/"+uri, 600)
 			return
 		}
 
