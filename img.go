@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/sha1"
+	"crypto/tls"
 	"encoding/hex"
 	"errors"
 	"flag"
@@ -18,7 +19,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-	"crypto/tls"
 )
 
 // HTTP headers struct
@@ -47,6 +47,11 @@ func urlStatus(uri string) error {
 		return err
 	}
 	if !ok {
+		return errors.New("Invalid URL")
+	}
+
+	status, err := connection.Hget("img/"+uri, "status").Str()
+	if err == nil && status == "Blocked" {
 		return errors.New("Invalid URL")
 	}
 
