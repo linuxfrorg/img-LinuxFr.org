@@ -158,6 +158,7 @@ func fetchImageFromServer(uri string) (headers Headers, body []byte, err error) 
 	client := &http.Client{Transport: tr}
 	res, err := client.Get(uri)
 	if err != nil {
+		log.Printf("Error on client.Get %s: %s\n", uri, err)
 		return
 	}
 	if res.StatusCode != 200 {
@@ -170,6 +171,7 @@ func fetchImageFromServer(uri string) (headers Headers, body []byte, err error) 
 	defer res.Body.Close()
 	body, err = ioutil.ReadAll(res.Body)
 	if err != nil {
+		log.Printf("Error on ioutil.ReadAll for %s: %s\n", uri, err)
 		return
 	}
 	if res.ContentLength > maxSize {
