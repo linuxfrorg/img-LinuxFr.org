@@ -8,7 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/bmizerany/pat"
-	"github.com/fzzbt/radix/redis"
+	"github.com/vmihailenco/redis"
 	"io"
 	"io/ioutil"
 	"log"
@@ -42,21 +42,24 @@ var connection *redis.Client
 
 // Check if an URL is valid and not temporary in error
 func urlStatus(uri string) error {
-	ok, err := connection.Hexists("img/"+uri, "created_at").Bool()
-	if err != nil {
+	hexists := connection.HExists("img/"+uri, "created_at")
+	if err := hexists.Err(); err != nil {
 		return err
 	}
-	if !ok {
+	if ok := hexists.Val(); !ok {
 		return errors.New("Invalid URL")
 	}
 
-	status, err := connection.Hget("img/"+uri, "status").Str()
-	if err == nil && status == "Blocked" {
-		return errors.New("Invalid URL")
+	hget := connection.HGet("img/"+uri, "status")
+	if err := hget.Err(); err == nil {
+		if status := hget.Val(); status == "Blocked" {
+			return errors.New("Invalid URL")
+		}
 	}
 
-	str, err := connection.Get("img/err/" + uri).Str()
-	if err == nil {
+	get := connection.Get("img/err/" + uri)
+	if err := get.Err(); err == nil {
+		str := get.Val()
 		return errors.New(str)
 	}
 
@@ -84,10 +87,11 @@ func generateChecksumForCache(body []byte) string {
 func fetchImageFromCache(uri string) (headers Headers, body []byte, ok bool) {
 	ok = false
 
-	contentType, err := connection.Hget("img/"+uri, "type").Str()
-	if err != nil {
+	hget := connection.HGet("img/"+uri, "type")
+	if err := hget.Err(); err != nil {
 		return
 	}
+	contentType := hget.Val()
 
 	filename := generateKeyForCache(uri)
 	stat, err := os.Stat(filename)
@@ -101,9 +105,11 @@ func fetchImageFromCache(uri string) (headers Headers, body []byte, ok bool) {
 	body, err = ioutil.ReadFile(filename)
 	ok = err == nil
 
-	present, err := connection.Exists("img/updated/" + uri).Bool()
-	if err == nil && !present {
-		go fetchImageFromServer(uri)
+	exists := connection.Exists("img/updated/" + uri)
+	if err := exists.Err(); err == nil {
+		if present := exists.Val(); !present {
+			go fetchImageFromServer(uri)
+		}
 	}
 
 	return
@@ -113,16 +119,18 @@ func fetchImageFromCache(uri string) (headers Headers, body []byte, ok bool) {
 func saveImageInCache(uri string, headers Headers, body []byte) {
 	go func() {
 		checksum := generateChecksumForCache(body)
-		was, err := connection.Hget("img/"+uri, "checksum").Str()
-		if err == nil && checksum == was {
-			connection.Set("img/updated/"+uri, headers.lastModified)
-			connection.Expire("img/updated/"+uri, 600)
-			return
+		hget := connection.HGet("img/"+uri, "checksum")
+		if err := hget.Err(); err == nil {
+			if was := hget.Val(); checksum == was {
+				connection.Set("img/updated/"+uri, headers.lastModified)
+				connection.Expire("img/updated/"+uri, 600)
+				return
+			}
 		}
 
 		filename := generateKeyForCache(uri)
 		dirname := path.Dir(filename)
-		err = os.MkdirAll(dirname, 0755)
+		err := os.MkdirAll(dirname, 0755)
 		if err != nil {
 			return
 		}
@@ -135,8 +143,8 @@ func saveImageInCache(uri string, headers Headers, body []byte) {
 		}
 
 		// And other infos in redis
-		connection.Hset("img/"+uri, "type", headers.contentType)
-		connection.Hset("img/"+uri, "checksum", checksum)
+		connection.HSet("img/"+uri, "type", headers.contentType)
+		connection.HSet("img/"+uri, "checksum", checksum)
 		connection.Set("img/updated/"+uri, headers.lastModified)
 		connection.Expire("img/updated/"+uri, 600)
 	}()
@@ -289,10 +297,8 @@ func main() {
 	if len(parts) >= 2 {
 		db, _ = strconv.Atoi(parts[1])
 	}
-	cfg := redis.DefaultConfig()
-	cfg.Database = db
-	cfg.Address = host
-	connection = redis.NewClient(cfg)
+	fmt.Printf("Connection %s  %d\n", host, db)
+	connection = redis.NewTCPClient(host, "", int64(db))
 	defer connection.Close()
 
 	// Routing
