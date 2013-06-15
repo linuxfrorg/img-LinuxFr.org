@@ -20,7 +20,7 @@ Th main benefits of using a proxy instead of linking directly the images are:
 How to use it?
 --------------
 
-[Install Go 1](http://golang.org/doc/install) and don't forget to set `$GOROOT`
+[Install Go 1](http://golang.org/doc/install) and don't forget to set `$GOPATH`
 
     $ go get -u github.com/nono/img-LinuxFr.org
     $ img-LinuxFr.org [-a addr] [-r redis] [-l log] [-d dir]
