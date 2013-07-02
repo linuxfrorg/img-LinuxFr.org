@@ -169,6 +169,8 @@ func fetchImageFromServer(uri string) (headers Headers, body []byte, err error) 
 		log.Printf("Error on client.Get %s: %s\n", uri, err)
 		return
 	}
+	defer res.Body.Close()
+
 	if res.StatusCode != 200 {
 		log.Printf("Status code of %s is: %d\n", uri, res.StatusCode)
 		err = errors.New("Unexpected status code")
@@ -176,7 +178,6 @@ func fetchImageFromServer(uri string) (headers Headers, body []byte, err error) 
 		return
 	}
 
-	defer res.Body.Close()
 	body, err = ioutil.ReadAll(res.Body)
 	if err != nil {
 		log.Printf("Error on ioutil.ReadAll for %s: %s\n", uri, err)
