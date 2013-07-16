@@ -15,6 +15,8 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"runtime"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 	"syscall"
@@ -270,7 +272,13 @@ func Status(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "OK")
 }
 
+func Profiling(w http.ResponseWriter, r *http.Request) {
+	pprof.WriteHeapProfile(w)
+}
+
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	// Parse the command-line
 	var addr string
 	var logs string
@@ -305,6 +313,7 @@ func main() {
 	// Routing
 	m := pat.New()
 	m.Get("/status", http.HandlerFunc(Status))
+	m.Get("/profiling", http.HandlerFunc(Profiling))
 	m.Get("/img/:encoded_url/:filename", http.HandlerFunc(Img))
 	m.Get("/img/:encoded_url", http.HandlerFunc(Img))
 	m.Get("/avatars/:encoded_url/:filename", http.HandlerFunc(Avatar))
