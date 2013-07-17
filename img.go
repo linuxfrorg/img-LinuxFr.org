@@ -179,12 +179,6 @@ func fetchImageFromServer(uri string) (headers Headers, body []byte, err error) 
 		saveErrorInCache(uri, err)
 		return
 	}
-
-	body, err = ioutil.ReadAll(res.Body)
-	if err != nil {
-		log.Printf("Error on ioutil.ReadAll for %s: %s\n", uri, err)
-		return
-	}
 	if res.ContentLength > maxSize {
 		log.Printf("Exceeded max size for %s: %d\n", uri, res.ContentLength)
 		err = errors.New("Exceeded max size")
@@ -199,6 +193,12 @@ func fetchImageFromServer(uri string) (headers Headers, body []byte, err error) 
 		return
 	}
 	log.Printf("Fetch %s (%s)\n", uri, contentType)
+
+	body, err = ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Printf("Error on ioutil.ReadAll for %s: %s\n", uri, err)
+		return
+	}
 
 	headers.contentType = contentType
 	headers.lastModified = time.Now().Format(time.RFC1123)
