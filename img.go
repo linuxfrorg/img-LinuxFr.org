@@ -185,7 +185,7 @@ func fetchImageFromServer(uri string) (headers Headers, body []byte, err error) 
 		return
 	}
 	contentType := res.Header.Get("Content-Type")
-	if contentType[0:5] != "image" {
+	if len(contentType) < 5 || contentType[0:5] != "image" {
 		log.Printf("%s has an invalid content-type: %s\n", uri, contentType)
 		err = errors.New("Invalid content-type")
 		saveErrorInCache(uri, err)
