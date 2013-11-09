@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"crypto/tls"
 	"encoding/hex"
@@ -8,7 +9,11 @@ import (
 	"flag"
 	"fmt"
 	"github.com/bmizerany/pat"
+	"github.com/nfnt/resize"
 	"github.com/vmihailenco/redis"
+	"image"
+	"image/jpeg"
+	"image/png"
 	"io"
 	"io/ioutil"
 	"log"
@@ -22,6 +27,15 @@ import (
 	"time"
 )
 
+// The URL for the default avatar
+const defaultAvatarUrl = "//linuxfr.org/images/default-avatar.png"
+
+// The maximal size for an image is 5MB
+const maxSize = 5 * (1 << 20)
+
+// Force the height of the avatar, width is computed to preserve ratio
+const AvatarHeight = 64
+
 // HTTP headers struct
 type Headers struct {
 	contentType  string
@@ -29,11 +43,49 @@ type Headers struct {
 	cacheControl string
 }
 
-// The URL for the default avatar
-const defaultAvatarUrl = "//linuxfr.org/images/default-avatar.png"
+// Behaviour is a way to customize handlers
+type Behaviour struct {
+	// Manipulate the image before sending it (resize for example)
+	Manipulate func(body []byte) []byte
+	// NotFound is called when we can't find a valid image at the original location
+	NotFound func(http.ResponseWriter, *http.Request)
+}
 
-// The maximal size for an image is 5MB
-const maxSize = 5 * (1 << 20)
+// The behaviour for normal images
+var ImgBehaviour = Behaviour{
+	func(body []byte) []byte {
+		return body
+	},
+	func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	},
+}
+
+// The behaviour for avatars
+var AvatarBehaviour = Behaviour{
+	func(body []byte) []byte {
+		img, format, err := image.Decode(bytes.NewReader(body))
+		if err != nil {
+			return body
+		}
+		m := resize.Resize(0, AvatarHeight, img, resize.Lanczos3Lut)
+		var buf bytes.Buffer
+		switch format {
+		case "png":
+			png.Encode(&buf, m)
+		case "jpeg":
+			jpeg.Encode(&buf, m, nil)
+		}
+		if buf.Len() == 0 {
+			return body
+		}
+		return buf.Bytes()
+	},
+	func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", defaultAvatarUrl)
+		w.WriteHeader(http.StatusFound)
+	},
+}
 
 // The directory for caching files
 var directory string
@@ -85,7 +137,7 @@ func generateChecksumForCache(body []byte) string {
 }
 
 // Fetch image from cache
-func fetchImageFromCache(uri string) (headers Headers, body []byte, ok bool) {
+func fetchImageFromCache(uri string, behaviour Behaviour) (headers Headers, body []byte, ok bool) {
 	ok = false
 
 	hget := connection.HGet("img/"+uri, "type")
@@ -109,7 +161,7 @@ func fetchImageFromCache(uri string) (headers Headers, body []byte, ok bool) {
 	exists := connection.Exists("img/updated/" + uri)
 	if err := exists.Err(); err == nil {
 		if present := exists.Val(); !present {
-			go fetchImageFromServer(uri)
+			go fetchImageFromServer(uri, behaviour)
 		}
 	}
 
@@ -160,7 +212,7 @@ func saveErrorInCache(uri string, err error) {
 }
 
 // Fetch the image from the distant server
-func fetchImageFromServer(uri string) (headers Headers, body []byte, err error) {
+func fetchImageFromServer(uri string, behaviour Behaviour) (headers Headers, body []byte, err error) {
 	// Accepts any certificate in HTTPS
 	cfg := &tls.Config{InsecureSkipVerify: true}
 	tr := &http.Transport{TLSClientConfig: cfg}
@@ -199,6 +251,8 @@ func fetchImageFromServer(uri string) (headers Headers, body []byte, err error) 
 		return
 	}
 
+	body = behaviour.Manipulate(body)
+
 	headers.contentType = contentType
 	headers.lastModified = time.Now().Format(time.RFC1123)
 	if urlStatus(uri) == nil {
@@ -208,15 +262,15 @@ func fetchImageFromServer(uri string) (headers Headers, body []byte, err error) 
 }
 
 // Fetch image from cache if available, or from the server
-func fetchImage(uri string) (headers Headers, body []byte, err error) {
+func fetchImage(uri string, behaviour Behaviour) (headers Headers, body []byte, err error) {
 	err = urlStatus(uri)
 	if err != nil {
 		return
 	}
 
-	headers, body, ok := fetchImageFromCache(uri)
+	headers, body, ok := fetchImageFromCache(uri, behaviour)
 	if !ok {
-		headers, body, err = fetchImageFromServer(uri)
+		headers, body, err = fetchImageFromServer(uri, behaviour)
 	}
 	headers.cacheControl = "public, max-age=600"
 
@@ -224,7 +278,7 @@ func fetchImage(uri string) (headers Headers, body []byte, err error) {
 }
 
 // Receive an HTTP request, fetch the image and respond with it
-func Image(w http.ResponseWriter, r *http.Request, fn func()) {
+func Image(w http.ResponseWriter, r *http.Request, behaviour Behaviour) {
 	encoded_url := r.URL.Query().Get(":encoded_url")
 	chars, err := hex.DecodeString(encoded_url)
 	if err != nil {
@@ -234,9 +288,9 @@ func Image(w http.ResponseWriter, r *http.Request, fn func()) {
 	}
 	uri := string(chars)
 
-	headers, body, err := fetchImage(uri)
+	headers, body, err := fetchImage(uri, behaviour)
 	if err != nil {
-		fn()
+		behaviour.NotFound(w, r)
 		return
 	}
 	if headers.lastModified == r.Header.Get("If-Modified-Since") {
@@ -251,19 +305,12 @@ func Image(w http.ResponseWriter, r *http.Request, fn func()) {
 
 // Receive an HTTP request for an image and respond with it
 func Img(w http.ResponseWriter, r *http.Request) {
-	fn := func() {
-		http.NotFound(w, r)
-	}
-	Image(w, r, fn)
+	Image(w, r, ImgBehaviour)
 }
 
 // Receive an HTTP request for an avatar and respond with it
 func Avatar(w http.ResponseWriter, r *http.Request) {
-	fn := func() {
-		w.Header().Set("Location", defaultAvatarUrl)
-		w.WriteHeader(http.StatusFound)
-	}
-	Image(w, r, fn)
+	Image(w, r, AvatarBehaviour)
 }
 
 // Returns 200 OK if the server is running (for monitoring)
