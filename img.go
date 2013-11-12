@@ -28,13 +28,16 @@ import (
 )
 
 // The URL for the default avatar
-const defaultAvatarUrl = "//linuxfr.org/images/default-avatar.png"
+const DefaultAvatarUrl = "//linuxfr.org/images/default-avatar.png"
 
 // The maximal size for an image is 5MB
-const maxSize = 5 * (1 << 20)
+const MaxSize = 5 * (1 << 20)
 
 // Force the height of the avatar, width is computed to preserve ratio
 const AvatarHeight = 64
+
+// Don't try ro refresh the cache more than once per hour
+const CacheRefreshInterval = 3600
 
 // HTTP headers struct
 type Headers struct {
@@ -82,7 +85,7 @@ var AvatarBehaviour = Behaviour{
 		return buf.Bytes()
 	},
 	func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Location", defaultAvatarUrl)
+		w.Header().Set("Location", DefaultAvatarUrl)
 		w.WriteHeader(http.StatusFound)
 	},
 }
@@ -176,7 +179,7 @@ func saveImageInCache(uri string, headers Headers, body []byte) {
 		if err := hget.Err(); err == nil {
 			if was := hget.Val(); checksum == was {
 				connection.Set("img/updated/"+uri, headers.lastModified)
-				connection.Expire("img/updated/"+uri, 600)
+				connection.Expire("img/updated/"+uri, CacheRefreshInterval)
 				return
 			}
 		}
@@ -199,7 +202,7 @@ func saveImageInCache(uri string, headers Headers, body []byte) {
 		connection.HSet("img/"+uri, "type", headers.contentType)
 		connection.HSet("img/"+uri, "checksum", checksum)
 		connection.Set("img/updated/"+uri, headers.lastModified)
-		connection.Expire("img/updated/"+uri, 600)
+		connection.Expire("img/updated/"+uri, CacheRefreshInterval)
 	}()
 }
 
@@ -207,7 +210,7 @@ func saveImageInCache(uri string, headers Headers, body []byte) {
 func saveErrorInCache(uri string, err error) {
 	go func() {
 		connection.Set("img/err/"+uri, err.Error())
-		connection.Expire("img/err/"+uri, 600)
+		connection.Expire("img/err/"+uri, CacheRefreshInterval)
 	}()
 }
 
@@ -230,7 +233,7 @@ func fetchImageFromServer(uri string, behaviour Behaviour) (headers Headers, bod
 		saveErrorInCache(uri, err)
 		return
 	}
-	if res.ContentLength > maxSize {
+	if res.ContentLength > MaxSize {
 		log.Printf("Exceeded max size for %s: %d\n", uri, res.ContentLength)
 		err = errors.New("Exceeded max size")
 		saveErrorInCache(uri, err)
@@ -272,7 +275,7 @@ func fetchImage(uri string, behaviour Behaviour) (headers Headers, body []byte, 
 	if !ok {
 		headers, body, err = fetchImageFromServer(uri, behaviour)
 	}
-	headers.cacheControl = "public, max-age=600"
+	headers.cacheControl = fmt.Sprintf("public, max-age=%d", CacheRefreshInterval)
 
 	return
 }
