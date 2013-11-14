@@ -162,11 +162,19 @@ func resetCacheTimer(uri string) {
 }
 
 // Fetch image from cache
-func fetchImageFromCache(uri string, behaviour Behaviour) (headers Headers, body []byte, ok bool) {
-	ok = false
+func fetchImageFromCache(uri string, behaviour Behaviour) (headers Headers, body []byte, err error) {
+	err = nil
+
+	exists := connection.Exists("img/updated/" + uri)
+	if exists.Err() != nil || !exists.Val() {
+		err = fetchImageFromServer(uri, behaviour)
+		if err != nil {
+			return
+		}
+	}
 
 	hget := connection.HGet("img/"+uri, "type")
-	if err := hget.Err(); err != nil {
+	if err = hget.Err(); err != nil {
 		return
 	}
 	contentType := hget.Val()
@@ -181,23 +189,15 @@ func fetchImageFromCache(uri string, behaviour Behaviour) (headers Headers, body
 	headers.lastModified = lastModified
 
 	body, err = ioutil.ReadFile(filename)
-	ok = err == nil
-
-	exists := connection.Exists("img/updated/" + uri)
-	if err := exists.Err(); err == nil {
-		if present := exists.Val(); !present {
-			go fetchImageFromServer(uri, behaviour)
-		}
-	}
 
 	return
 }
 
 // Save the body and the content-type header in cache
-func saveImageInCache(uri string, headers Headers, body []byte) {
+func saveImageInCache(uri string, contentType string, body []byte) (err error) {
 	checksum := generateChecksumForCache(body)
 	hget := connection.HGet("img/"+uri, "checksum")
-	if err := hget.Err(); err == nil {
+	if err = hget.Err(); err == nil {
 		if was := hget.Val(); checksum == was {
 			resetCacheTimer(uri)
 			return
@@ -206,7 +206,7 @@ func saveImageInCache(uri string, headers Headers, body []byte) {
 
 	filename := generateKeyForCache(uri)
 	dirname := path.Dir(filename)
-	err := os.MkdirAll(dirname, 0755)
+	err = os.MkdirAll(dirname, 0755)
 	if err != nil {
 		return
 	}
@@ -219,9 +219,11 @@ func saveImageInCache(uri string, headers Headers, body []byte) {
 	}
 
 	// And other infos in redis
-	connection.HSet("img/"+uri, "type", headers.contentType)
+	connection.HSet("img/"+uri, "type", contentType)
 	connection.HSet("img/"+uri, "checksum", checksum)
 	resetCacheTimer(uri)
+
+	return
 }
 
 // Save the error in redis for 10 minutes
@@ -233,7 +235,7 @@ func saveErrorInCache(uri string, err error) {
 }
 
 // Fetch the image from the distant server
-func fetchImageFromServer(uri string, behaviour Behaviour) (headers Headers, body []byte, err error) {
+func fetchImageFromServer(uri string, behaviour Behaviour) (err error) {
 	// Accepts any certificate in HTTPS
 	cfg := &tls.Config{InsecureSkipVerify: true}
 	tr := &http.Transport{TLSClientConfig: cfg}
@@ -266,7 +268,7 @@ func fetchImageFromServer(uri string, behaviour Behaviour) (headers Headers, bod
 	}
 	log.Printf("Fetch %s (%s)\n", uri, contentType)
 
-	body, err = ioutil.ReadAll(res.Body)
+	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		log.Printf("Error on ioutil.ReadAll for %s: %s\n", uri, err)
 		return
@@ -274,10 +276,8 @@ func fetchImageFromServer(uri string, behaviour Behaviour) (headers Headers, bod
 
 	body = behaviour.Manipulate(body)
 
-	headers.contentType = contentType
-	headers.lastModified = time.Now().Format(time.RFC1123)
 	if urlStatus(uri) == nil {
-		go saveImageInCache(uri, headers, body)
+		err = saveImageInCache(uri, contentType, body)
 	}
 	return
 }
@@ -289,10 +289,7 @@ func fetchImage(uri string, behaviour Behaviour) (headers Headers, body []byte, 
 		return
 	}
 
-	headers, body, ok := fetchImageFromCache(uri, behaviour)
-	if !ok {
-		headers, body, err = fetchImageFromServer(uri, behaviour)
-	}
+	headers, body, err = fetchImageFromCache(uri, behaviour)
 	headers.cacheControl = fmt.Sprintf("public, max-age=%d", CacheRefreshInterval)
 
 	return
