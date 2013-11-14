@@ -146,7 +146,11 @@ func getModTime(uri string) (modTime string, err error) {
 	if err != nil {
 		return
 	}
-	modTime = stat.ModTime().Format(time.RFC1123)
+	gmt, err := time.LoadLocation("GMT")
+	if err != nil {
+		return
+	}
+	modTime = stat.ModTime().In(gmt).Format(time.RFC1123)
 	return
 }
 
