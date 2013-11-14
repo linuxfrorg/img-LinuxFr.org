@@ -139,6 +139,28 @@ func generateChecksumForCache(body []byte) string {
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
+// Retrieve mtime of the cached file
+func getModTime(uri string) (modTime string, err error) {
+	filename := generateKeyForCache(uri)
+	stat, err := os.Stat(filename)
+	if err != nil {
+		return
+	}
+	modTime = stat.ModTime().Format(time.RFC1123)
+	return
+}
+
+// Tell the cache that the metadata we have for that URL is still valid
+func resetCacheTimer(uri string) {
+	mtime, err := getModTime(uri)
+	if err != nil {
+		log.Printf("Couldn't Get mtime while resetting cache timer for %s: %s\n", uri, err)
+		return
+	}
+	connection.Set("img/updated/"+uri, mtime)
+	connection.Expire("img/updated/"+uri, CacheRefreshInterval)
+}
+
 // Fetch image from cache
 func fetchImageFromCache(uri string, behaviour Behaviour) (headers Headers, body []byte, ok bool) {
 	ok = false
@@ -150,13 +172,13 @@ func fetchImageFromCache(uri string, behaviour Behaviour) (headers Headers, body
 	contentType := hget.Val()
 
 	filename := generateKeyForCache(uri)
-	stat, err := os.Stat(filename)
+	lastModified, err := getModTime(uri)
 	if err != nil {
 		return
 	}
 
 	headers.contentType = contentType
-	headers.lastModified = stat.ModTime().Format(time.RFC1123)
+	headers.lastModified = lastModified
 
 	body, err = ioutil.ReadFile(filename)
 	ok = err == nil
@@ -178,8 +200,7 @@ func saveImageInCache(uri string, headers Headers, body []byte) {
 		hget := connection.HGet("img/"+uri, "checksum")
 		if err := hget.Err(); err == nil {
 			if was := hget.Val(); checksum == was {
-				connection.Set("img/updated/"+uri, headers.lastModified)
-				connection.Expire("img/updated/"+uri, CacheRefreshInterval)
+				resetCacheTimer(uri)
 				return
 			}
 		}
@@ -201,8 +222,7 @@ func saveImageInCache(uri string, headers Headers, body []byte) {
 		// And other infos in redis
 		connection.HSet("img/"+uri, "type", headers.contentType)
 		connection.HSet("img/"+uri, "checksum", checksum)
-		connection.Set("img/updated/"+uri, headers.lastModified)
-		connection.Expire("img/updated/"+uri, CacheRefreshInterval)
+		resetCacheTimer(uri)
 	}()
 }
 
