@@ -195,35 +195,33 @@ func fetchImageFromCache(uri string, behaviour Behaviour) (headers Headers, body
 
 // Save the body and the content-type header in cache
 func saveImageInCache(uri string, headers Headers, body []byte) {
-	go func() {
-		checksum := generateChecksumForCache(body)
-		hget := connection.HGet("img/"+uri, "checksum")
-		if err := hget.Err(); err == nil {
-			if was := hget.Val(); checksum == was {
-				resetCacheTimer(uri)
-				return
-			}
-		}
-
-		filename := generateKeyForCache(uri)
-		dirname := path.Dir(filename)
-		err := os.MkdirAll(dirname, 0755)
-		if err != nil {
+	checksum := generateChecksumForCache(body)
+	hget := connection.HGet("img/"+uri, "checksum")
+	if err := hget.Err(); err == nil {
+		if was := hget.Val(); checksum == was {
+			resetCacheTimer(uri)
 			return
 		}
+	}
 
-		// Save the body on disk
-		err = ioutil.WriteFile(filename, body, 0644)
-		if err != nil {
-			log.Printf("Error while writing %s\n", filename)
-			return
-		}
+	filename := generateKeyForCache(uri)
+	dirname := path.Dir(filename)
+	err := os.MkdirAll(dirname, 0755)
+	if err != nil {
+		return
+	}
 
-		// And other infos in redis
-		connection.HSet("img/"+uri, "type", headers.contentType)
-		connection.HSet("img/"+uri, "checksum", checksum)
-		resetCacheTimer(uri)
-	}()
+	// Save the body on disk
+	err = ioutil.WriteFile(filename, body, 0644)
+	if err != nil {
+		log.Printf("Error while writing %s\n", filename)
+		return
+	}
+
+	// And other infos in redis
+	connection.HSet("img/"+uri, "type", headers.contentType)
+	connection.HSet("img/"+uri, "checksum", checksum)
+	resetCacheTimer(uri)
 }
 
 // Save the error in redis for 10 minutes
@@ -279,7 +277,7 @@ func fetchImageFromServer(uri string, behaviour Behaviour) (headers Headers, bod
 	headers.contentType = contentType
 	headers.lastModified = time.Now().Format(time.RFC1123)
 	if urlStatus(uri) == nil {
-		saveImageInCache(uri, headers, body)
+		go saveImageInCache(uri, headers, body)
 	}
 	return
 }
