@@ -194,7 +194,7 @@ func fetchImageFromCache(uri string, behaviour Behaviour) (headers Headers, body
 }
 
 // Save the body and the content-type header in cache
-func saveImageInCache(uri string, contentType string, body []byte) (err error) {
+func saveImageInCache(uri string, contentType string, etag string, body []byte) (err error) {
 	checksum := generateChecksumForCache(body)
 	hget := connection.HGet("img/"+uri, "checksum")
 	if err = hget.Err(); err == nil {
@@ -221,6 +221,11 @@ func saveImageInCache(uri string, contentType string, body []byte) (err error) {
 	// And other infos in redis
 	connection.HSet("img/"+uri, "type", contentType)
 	connection.HSet("img/"+uri, "checksum", checksum)
+	if etag == "" {
+		connection.HDel("img/"+uri, "etag")
+	} else {
+		connection.HSet("img/"+uri, "etag", etag)
+	}
 	resetCacheTimer(uri)
 
 	return
@@ -240,13 +245,30 @@ func fetchImageFromServer(uri string, behaviour Behaviour) (err error) {
 	cfg := &tls.Config{InsecureSkipVerify: true}
 	tr := &http.Transport{TLSClientConfig: cfg}
 	client := &http.Client{Transport: tr}
-	res, err := client.Get(uri)
+
+	req, err := http.NewRequest("GET", uri, nil)
+	if err != nil {
+		log.Printf("Error on http.NewRequest GET %s: %s\n", uri, err)
+		return
+	}
+	hget := connection.HGet("img/"+uri, "etag")
+	if err = hget.Err(); err == nil {
+		etag := hget.Val()
+		req.Header.Set("If-None-Match", etag)
+	}
+
+	res, err := client.Do(req)
 	if err != nil {
 		log.Printf("Error on client.Get %s: %s\n", uri, err)
 		return
 	}
 	defer res.Body.Close()
 
+	if res.StatusCode == 304 {
+		resetCacheTimer(uri)
+		err = nil
+		return
+	}
 	if res.StatusCode != 200 {
 		log.Printf("Status code of %s is: %d\n", uri, res.StatusCode)
 		err = errors.New("Unexpected status code")
@@ -266,7 +288,8 @@ func fetchImageFromServer(uri string, behaviour Behaviour) (err error) {
 		saveErrorInCache(uri, err)
 		return
 	}
-	log.Printf("Fetch %s (%s)\n", uri, contentType)
+	etag := res.Header.Get("ETag")
+	log.Printf("Fetch %s (%s) (ETag: %s)\n", uri, contentType, etag)
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
@@ -277,7 +300,7 @@ func fetchImageFromServer(uri string, behaviour Behaviour) (err error) {
 	body = behaviour.Manipulate(body)
 
 	if urlStatus(uri) == nil {
-		err = saveImageInCache(uri, contentType, body)
+		err = saveImageInCache(uri, contentType, etag, body)
 	}
 	return
 }
