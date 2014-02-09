@@ -26,7 +26,7 @@ import (
 	"github.com/bmizerany/pat"
 	httpclient "github.com/mreiferson/go-httpclient"
 	"github.com/nfnt/resize"
-	"github.com/vmihailenco/redis"
+	redis "github.com/vmihailenco/redis/v2"
 )
 
 // The URL for the default avatar
@@ -39,7 +39,7 @@ const MaxSize = 5 * (1 << 20)
 const AvatarHeight = 64
 
 // Don't try ro refresh the cache more than once per hour
-const CacheRefreshInterval = 3600
+const CacheRefreshInterval = 1 * time.Hour
 
 // HTTP headers struct
 type Headers struct {
@@ -324,7 +324,7 @@ func fetchImage(uri string, behaviour Behaviour) (headers Headers, body []byte, 
 	}
 
 	headers, body, err = fetchImageFromCache(uri, behaviour)
-	headers.cacheControl = fmt.Sprintf("public, max-age=%d", CacheRefreshInterval)
+	headers.cacheControl = fmt.Sprintf("public, max-age=%d", CacheRefreshInterval/time.Second)
 
 	return
 }
@@ -401,7 +401,10 @@ func main() {
 		db, _ = strconv.Atoi(parts[1])
 	}
 	fmt.Printf("Connection %s  %d\n", host, db)
-	connection = redis.NewTCPClient(host, "", int64(db))
+	connection = redis.NewTCPClient(&redis.Options{
+		Addr: host,
+		DB:   int64(db),
+	})
 	defer connection.Close()
 
 	// Routing
