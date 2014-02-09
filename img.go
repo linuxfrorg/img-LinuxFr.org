@@ -73,7 +73,7 @@ var AvatarBehaviour = Behaviour{
 		if err != nil {
 			return body
 		}
-		m := resize.Resize(0, AvatarHeight, img, resize.Lanczos3Lut)
+		m := resize.Resize(0, AvatarHeight, img, resize.Lanczos3)
 		var buf bytes.Buffer
 		switch format {
 		case "png":
