@@ -8,9 +8,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/bmizerany/pat"
-	"github.com/nfnt/resize"
-	"github.com/vmihailenco/redis"
 	"image"
 	"image/jpeg"
 	"image/png"
@@ -25,6 +22,11 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/bmizerany/pat"
+	httpclient "github.com/mreiferson/go-httpclient"
+	"github.com/nfnt/resize"
+	"github.com/vmihailenco/redis"
 )
 
 // The URL for the default avatar
@@ -247,8 +249,13 @@ func saveErrorInCache(uri string, err error) {
 func fetchImageFromServer(uri string, behaviour Behaviour) (err error) {
 	// Accepts any certificate in HTTPS
 	cfg := &tls.Config{InsecureSkipVerify: true}
-	tr := &http.Transport{TLSClientConfig: cfg}
-	client := &http.Client{Transport: tr}
+	trp := &httpclient.Transport{
+		TLSClientConfig:       cfg,
+		ConnectTimeout:        10 * time.Second,
+		RequestTimeout:        10 * time.Second,
+		ResponseHeaderTimeout: 10 * time.Second,
+	}
+	client := &http.Client{Transport: trp}
 
 	req, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
