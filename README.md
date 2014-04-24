@@ -20,9 +20,9 @@ Th main benefits of using a proxy instead of linking directly the images are:
 How to use it?
 --------------
 
-[Install Go 1](http://golang.org/doc/install) and don't forget to set `$GOPATH`
+[Install Go](http://golang.org/doc/install) and don't forget to set `$GOPATH`
 
-    $ go get -u github.com/nono/img-LinuxFr.org
+    $ go get -u github.com/linuxfrorg/img-LinuxFr.org
     $ img-LinuxFr.org [-a addr] [-r redis] [-l log] [-d dir]
 
 And, to display the help:
@@ -48,7 +48,7 @@ instead of using it for several reasons:
 See also
 --------
 
-* [Git repository](http://github.com/nono/img-LinuxFr.org)
+* [Git repository](https://github.com/linuxfrorg/img-LinuxFr.org)
 * [Camo](https://github.com/atmos/camo)
 
 
