@@ -26,7 +26,7 @@ import (
 	"github.com/bmizerany/pat"
 	httpclient "github.com/mreiferson/go-httpclient"
 	"github.com/nfnt/resize"
-	redis "github.com/vmihailenco/redis/v2"
+	redis "gopkg.in/redis.v3"
 )
 
 // The URL for the default avatar
@@ -98,6 +98,9 @@ var directory string
 // The connection to redis
 var connection *redis.Client
 
+// The HTTP client
+var httpClient *http.Client
+
 // Check if an URL is valid and not temporary in error
 func urlStatus(uri string) error {
 	hexists := connection.HExists("img/"+uri, "created_at")
@@ -163,8 +166,7 @@ func resetCacheTimer(uri string) {
 		log.Printf("Couldn't Get mtime while resetting cache timer for %s: %s\n", uri, err)
 		return
 	}
-	connection.Set("img/updated/"+uri, mtime)
-	connection.Expire("img/updated/"+uri, CacheRefreshInterval)
+	connection.Set("img/updated/"+uri, mtime, CacheRefreshInterval)
 }
 
 // Fetch image from cache
@@ -240,23 +242,12 @@ func saveImageInCache(uri string, contentType string, etag string, body []byte) 
 // Save the error in redis for 10 minutes
 func saveErrorInCache(uri string, err error) {
 	go func() {
-		connection.Set("img/err/"+uri, err.Error())
-		connection.Expire("img/err/"+uri, CacheRefreshInterval)
+		connection.Set("img/err/"+uri, err.Error(), CacheRefreshInterval)
 	}()
 }
 
 // Fetch the image from the distant server
 func fetchImageFromServer(uri string, behaviour Behaviour) (err error) {
-	// Accepts any certificate in HTTPS
-	cfg := &tls.Config{InsecureSkipVerify: true}
-	trp := &httpclient.Transport{
-		TLSClientConfig:       cfg,
-		ConnectTimeout:        10 * time.Second,
-		RequestTimeout:        10 * time.Second,
-		ResponseHeaderTimeout: 10 * time.Second,
-	}
-	client := &http.Client{Transport: trp}
-
 	req, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
 		log.Printf("Error on http.NewRequest GET %s: %s\n", uri, err)
@@ -268,9 +259,9 @@ func fetchImageFromServer(uri string, behaviour Behaviour) (err error) {
 		req.Header.Set("If-None-Match", etag)
 	}
 
-	res, err := client.Do(req)
+	res, err := httpClient.Do(req)
 	if err != nil {
-		log.Printf("Error on client.Get %s: %s\n", uri, err)
+		log.Printf("Error on httpClient.Get %s: %s\n", uri, err)
 		return
 	}
 	defer res.Body.Close()
@@ -401,11 +392,21 @@ func main() {
 		db, _ = strconv.Atoi(parts[1])
 	}
 	fmt.Printf("Connection %s  %d\n", host, db)
-	connection = redis.NewTCPClient(&redis.Options{
+	connection = redis.NewClient(&redis.Options{
 		Addr: host,
 		DB:   int64(db),
 	})
 	defer connection.Close()
+
+	// Accepts any certificate in HTTPS
+	cfg := &tls.Config{InsecureSkipVerify: true}
+	trp := &httpclient.Transport{
+		TLSClientConfig:       cfg,
+		ConnectTimeout:        10 * time.Second,
+		RequestTimeout:        10 * time.Second,
+		ResponseHeaderTimeout: 10 * time.Second,
+	}
+	httpClient = &http.Client{Transport: trp}
 
 	// Routing
 	m := pat.New()
