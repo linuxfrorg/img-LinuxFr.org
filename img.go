@@ -101,6 +101,9 @@ var connection *redis.Client
 // The HTTP client
 var httpClient *http.Client
 
+// The User-Agent to use for HTTP requests
+var userAgent string
+
 // Check if an URL is valid and not temporary in error
 func urlStatus(uri string) error {
 	hexists := connection.HExists("img/"+uri, "created_at")
@@ -259,6 +262,7 @@ func fetchImageFromServer(uri string, behaviour Behaviour) (err error) {
 		req.Header.Set("If-None-Match", etag)
 	}
 
+	req.Header.Set("User-Agent", userAgent)
 	res, err := httpClient.Do(req)
 	if err != nil {
 		log.Printf("Error on httpClient.Get %s: %s\n", uri, err)
@@ -372,6 +376,7 @@ func main() {
 	flag.StringVar(&logs, "l", "-", "Use this file for logs")
 	flag.StringVar(&conn, "r", "localhost:6379/0", "The redis database to use for caching meta")
 	flag.StringVar(&directory, "d", "cache", "The directory for the caching files")
+	flag.StringVar(&userAgent, "u", "img_LinuxFr.org/1.0", "The User-Agent used for making HTTP requests")
 	flag.Parse()
 
 	// Logging
