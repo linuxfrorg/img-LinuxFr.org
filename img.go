@@ -30,7 +30,7 @@ import (
 )
 
 // The URL for the default avatar
-const DefaultAvatarUrl = "//linuxfr.org/images/default-avatar.png"
+const DefaultAvatarUrl = "//linuxfr.org/images/default-avatar.svg"
 
 // The maximal size for an image is 5MB
 const MaxSize = 5 * (1 << 20)
