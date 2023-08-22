@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Build
-FROM golang:1.21-alpine AS build
+FROM docker.io/golang:1.21-alpine AS build
 
 WORKDIR /app
 
@@ -18,9 +18,7 @@ RUN govulncheck ./...
 RUN govulncheck --mode=binary /img-LinuxFr.org
 
 # Deploy
-FROM alpine
-ARG REDIS
-ENV REDIS=${REDIS:-redis:6379/0}
+FROM docker.io/alpine
 USER 1000
 
 WORKDIR /
@@ -29,5 +27,4 @@ COPY --from=build /img-LinuxFr.org /img-LinuxFr.org
 
 EXPOSE 8000
 
-
-ENTRYPOINT /img-LinuxFr.org -r ${REDIS}
+CMD /img-LinuxFr.org -r ${REDIS:-redis:6379/0}
