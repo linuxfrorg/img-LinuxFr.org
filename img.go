@@ -32,7 +32,7 @@ import (
 // The URL for the default avatar
 const DefaultAvatarUrl = "//linuxfr.org/images/default-avatar.png"
 
-// The maximal size for an image is 5MB
+// The maximal size for an image is 5MiB
 const MaxSize = 5 * (1 << 20)
 
 // Force the height of the avatar, width is computed to preserve ratio
@@ -136,11 +136,11 @@ func generateKeyForCache(s string) string {
 	io.WriteString(h, s)
 	key := h.Sum(nil)
 
-	// Use 3 levels of hasing to avoid having too many files in the same directory
+	// Use 3 levels of hashing to avoid having too many files in the same directory
 	return fmt.Sprintf("%s/%x/%x/%x/%x", directory, key[0:1], key[1:2], key[2:3], key[3:])
 }
 
-// Generate a key for cache from a string
+// Generate a checksum for cache from a string
 func generateChecksumForCache(body []byte) string {
 	h := sha1.New()
 	h.Write(body)

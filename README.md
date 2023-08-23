@@ -16,19 +16,27 @@ Th main benefits of using a proxy instead of linking directly the images are:
 - **Privacy**: the users won't connect to the external domains, so their IP
   addresses won't be logged on these servers.
 
-
-How to use it?
---------------
+How to use it? (outside Docker)
+-------------------------------
 
 [Install Go](http://golang.org/doc/install) and don't forget to set `$GOPATH`
 
-    $ go get -u github.com/linuxfrorg/img-LinuxFr.org
+    $ go get -v -u github.com/linuxfrorg/img-LinuxFr.org
     $ img-LinuxFr.org [-a addr] [-r redis] [-l log] [-d dir]
 
 And, to display the help:
 
     $ img-LinuxFr.org -h
 
+How to use it? (with Docker)
+-------------------------------
+
+Build and run Docker image:
+
+    $ docker build -t img-linuxfr.org .
+    $ docker run --publish 8000:8000 img-linuxfr.org
+    or
+    $ docker run --publish 8000:8000 --env REDIS=someredis:6379/1 img-linuxfr.org
 
 Why don't you use camo?
 -----------------------
@@ -50,7 +58,6 @@ See also
 
 * [Git repository](https://github.com/linuxfrorg/img-LinuxFr.org)
 * [Camo](https://github.com/atmos/camo)
-
 
 Copyright
 ---------
