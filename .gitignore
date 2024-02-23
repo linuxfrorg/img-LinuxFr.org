@@ -1,3 +1,4 @@
-cache
 img-LinuxFr.org
-tests/
+img-linuxfr.org
+tests/cache-img/*
+tests/data-nginx/red_100x100_*_after_fetch.png

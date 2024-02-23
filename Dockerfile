@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Build
-FROM docker.io/golang:1.21-alpine AS build
+FROM docker.io/golang:1.22.2-alpine AS build
 
 WORKDIR /app
 
@@ -17,14 +17,18 @@ RUN go install golang.org/x/vuln/cmd/govulncheck@latest
 RUN govulncheck ./...
 RUN govulncheck --mode=binary /img-LinuxFr.org
 
+RUN apk add tzdata
+
 # Deploy
 FROM docker.io/alpine
 USER 1000
 
 WORKDIR /
 
+COPY --from=build /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=build /img-LinuxFr.org /img-LinuxFr.org
+
 
 EXPOSE 8000
 
-CMD /img-LinuxFr.org -r ${REDIS:-redis:6379/0}
+CMD /img-LinuxFr.org -r ${REDIS:-redis:6379/0} -d ${CACHE:-cache} -l ${LOGFILE:--} -a ${ADDR:-127.0.0.1:8000}
