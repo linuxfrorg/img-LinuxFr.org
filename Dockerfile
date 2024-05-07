@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Build
-FROM docker.io/golang:1.22.2-alpine AS build
+FROM docker.io/golang:1.22.3-alpine AS build
 
 WORKDIR /app
 
