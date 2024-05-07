@@ -1,0 +1,70 @@
+---
+version: "3.8"
+
+services:
+
+  linuxfr.org-img:
+    build:
+      context: ..
+    environment:
+      REDIS: "redis:6379/0"
+      #works also with REDIS: "[fd42:3200:3200::30]:6379/0"
+      CACHE: "/cache"
+      ADDR: "0.0.0.0:8000"
+    depends_on:
+      - redis
+      - nginx
+    volumes:
+      - ./cache-img:/cache
+    ports:
+      - "8000:8000"
+    networks:
+      ipv6_network:
+        ipv4_address: 192.168.42.40
+        ipv6_address: fd42:3200:3200::40
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv6.conf.eth0.proxy_ndp=1
+
+  redis:
+    image: redis:5
+    volumes:
+      - data-redis:/data
+    ports:
+      - "16379:6379"
+    networks:
+      ipv6_network:
+        ipv4_address: 192.168.42.30
+        ipv6_address: fd42:3200:3200::30
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv6.conf.eth0.proxy_ndp=1
+
+  nginx:
+    image: nginx:1.25.4
+    volumes:
+      - ./data-nginx:/usr/share/nginx/html
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      ipv6_network:
+        ipv4_address: 192.168.42.20
+        ipv6_address: fd42:3200:3200::20
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv6.conf.eth0.proxy_ndp=1
+
+volumes:
+  data-redis:
+    driver: local
+
+networks:
+  ipv6_network:
+    enable_ipv6: true
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: fd42:3200:3200::/64
+          gateway: fd42:3200:3200::1
+        - subnet: 192.168.42.0/24
+          gateway: 192.168.42.1
