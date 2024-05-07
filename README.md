@@ -27,7 +27,7 @@ How to use it? (outside Docker)
 [Install Go](http://golang.org/doc/install) and don't forget to set `$GOPATH`
 
     $ go get -v -u github.com/linuxfrorg/img-LinuxFr.org
-    $ img-LinuxFr.org [-a addr] [-r redis] [-l log] [-d dir]
+    $ img-LinuxFr.org [-a addr] [-r redis] [-l log] [-d dir] [-u agent] [-e avatar]
 
 And, to display the help:
 

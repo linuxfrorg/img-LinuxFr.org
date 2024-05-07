@@ -11,7 +11,7 @@ RUN go mod download
 
 COPY *.go ./
 
-RUN go build -o /img-LinuxFr.org
+RUN go build -trimpath -o /img-LinuxFr.org
 
 RUN go install golang.org/x/vuln/cmd/govulncheck@latest
 RUN govulncheck ./...
@@ -31,4 +31,4 @@ COPY --from=build /img-LinuxFr.org /img-LinuxFr.org
 
 EXPOSE 8000
 
-CMD /img-LinuxFr.org -r ${REDIS:-redis:6379/0} -d ${CACHE:-cache} -l ${LOGFILE:--} -a ${ADDR:-127.0.0.1:8000}
+CMD /img-LinuxFr.org -r ${REDIS:-redis:6379/0} -d ${CACHE:-cache} -l ${LOGFILE:--} -a ${ADDR:-127.0.0.1:8000} -e ${AVATAR:-//nginx/default-avatar.svg}
