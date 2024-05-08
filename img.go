@@ -29,9 +29,6 @@ import (
 	redis "gopkg.in/redis.v3"
 )
 
-// The URL for the default avatar
-const DefaultAvatarUrl = "//linuxfr.org/images/default-avatar.png"
-
 // The maximal size for an image is 5MiB
 const MaxSize = 5 * (1 << 20)
 
@@ -87,7 +84,7 @@ var AvatarBehaviour = Behaviour{
 		return buf.Bytes()
 	},
 	func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Location", DefaultAvatarUrl)
+		w.Header().Set("Location", defaultAvatarUrl)
 		w.WriteHeader(http.StatusFound)
 	},
 }
@@ -103,6 +100,9 @@ var httpClient *http.Client
 
 // The User-Agent to use for HTTP requests
 var userAgent string
+
+// The address for avatars by default
+var defaultAvatarUrl string
 
 // Check if an URL is valid and not temporary in error
 func urlStatus(uri string) error {
@@ -374,9 +374,10 @@ func main() {
 	var conn string
 	flag.StringVar(&addr, "a", "127.0.0.1:8000", "Bind to this address:port")
 	flag.StringVar(&logs, "l", "-", "Use this file for logs")
-	flag.StringVar(&conn, "r", "localhost:6379/0", "The redis database to use for caching meta")
-	flag.StringVar(&directory, "d", "cache", "The directory for the caching files")
-	flag.StringVar(&userAgent, "u", "img_LinuxFr.org/1.0", "The User-Agent used for making HTTP requests")
+	flag.StringVar(&conn, "r", "localhost:6379/0", "Use this redis database for caching meta")
+	flag.StringVar(&directory, "d", "cache", "Cache files in this directory")
+	flag.StringVar(&userAgent, "u", "img_LinuxFr.org/1.0", "Use this User-Agent making HTTP requests")
+	flag.StringVar(&defaultAvatarUrl, "e", "//nginx/default-avatar.svg", "Default to this avatar URL")
 	flag.Parse()
 
 	// Logging
