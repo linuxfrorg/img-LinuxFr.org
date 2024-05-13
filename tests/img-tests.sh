@@ -92,14 +92,18 @@ redis-cli -p 16379 hset img/http://nginx/blocked.png status Blocked > /dev/null
 # tests first fetch
 for ip in 4 6
 do
-  target="TARGET$ip"
-  hurl -$ip ${DEBUG:+-v} \
-    --variable "TARGET=${!target}" \
-    --variable "NGINX4=$NGINX4" \
-    --variable "NGINX4_HEX=$NGINX4_HEX" \
-    --variable "NGINX6=$NGINX6" \
-    --variable "NGINX6_HEX=$NGINX6_HEX" \
-    --test tests_misc.hurl tests_img.hurl tests_avatars.hurl
+  for http2 in false true
+  do
+    target="TARGET$ip"
+    hurl -$ip ${DEBUG:+-v} \
+      --variable "TARGET=${!target}" \
+      --variable "HTTP2=${http2}" \
+      --variable "NGINX4=$NGINX4" \
+      --variable "NGINX4_HEX=$NGINX4_HEX" \
+      --variable "NGINX6=$NGINX6" \
+      --variable "NGINX6_HEX=$NGINX6_HEX" \
+      --test tests_misc.hurl tests_img.hurl tests_avatars.hurl
+  done
 done
 
 # alter images after first fetch
@@ -112,14 +116,18 @@ redis-cli -p 16379 hset img/http://nginx/red_100x100_blocked_after_fetch.png sta
 
 for ip in 4 6
 do
-  target="TARGET$ip"
-  hurl -$ip ${DEBUG:+-v} \
-    --variable "TARGET=${!target}" \
-    --variable "NGINX4=$NGINX4" \
-    --variable "NGINX4_HEX=$NGINX4_HEX" \
-    --variable "NGINX6=$NGINX6" \
-    --variable "NGINX6_HEX=$NGINX6_HEX" \
-    --test tests_img_after_fetch.hurl
+  for http2 in false true
+  do
+    target="TARGET$ip"
+    hurl -$ip ${DEBUG:+-v} \
+      --variable "TARGET=${!target}" \
+      --variable "HTTP2=${http2}" \
+      --variable "NGINX4=$NGINX4" \
+      --variable "NGINX4_HEX=$NGINX4_HEX" \
+      --variable "NGINX6=$NGINX6" \
+      --variable "NGINX6_HEX=$NGINX6_HEX" \
+      --test tests_img_after_fetch.hurl
+  done
 done
 
 # 1 counted things / 2 computed / 3 expected
