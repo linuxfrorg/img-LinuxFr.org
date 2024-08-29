@@ -48,7 +48,8 @@ Why don't you use camo?
 
 (answer from Bruno Michel, in 2012)
 
-Github has developed a similar service, camo, for their own usage.
+Github has developed a similar service, [camo](https://github.com/atmos/camo),
+for their own usage.
 I used it as a source of inspiration but I prefered to redevelop a new service
 instead of using it for several reasons:
 
@@ -64,7 +65,7 @@ Redis schema
 (extracted from [full LinuxFr.org Redis schema](https://github.com/linuxfrorg/linuxfr.org/blob/master/db/redis.txt))
 
 Key                                            | Type   | Value                 | Expiration | Description
------------------------------------------------|--------|---------------------------------------------------------
+---------------------------------------------- | ------ | --------------------- | ---------- | -------------------
 `img/<uri>`                                    |  hash  |                       |     no     | Images, with fields 'created_at': seconds since Epoch, 'status': 'Blocked' if administratively blocked (by moderation), 'type': content-type like 'image/jpeg' (set by `img` daemon), 'checksum': SHA1 (set by `img` daemon), and 'etag': etag (set by `img` daemon)
 `img/err/<uri>`                                | string |         error         |     no     | Images in error, like "Invalid content-type", created by `img` daemon but removed by `dlfp`
 `img/updated/<uri>`                            | string |        modtime        |     1h     | Cached images, created by `img` daemon, value like "Thu, 12 Dec 2013 12:28:47 GMT"
@@ -82,8 +83,7 @@ DEBUG=1 ./img-tests.sh
 See also
 --------
 
-* [Git repository](https://github.com/linuxfrorg/img-LinuxFr.org)
-* [Camo](https://github.com/atmos/camo)
+* [Git repository for img-LinuxFr.org](https://github.com/linuxfrorg/img-LinuxFr.org)
 
 Copyright
 ---------
