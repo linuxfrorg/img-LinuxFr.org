@@ -72,12 +72,18 @@ Key                                            | Type   | Value                 
 
 Testsuite
 ---------
-Testsuite requires [Hurl](https://hurl.dev/) and docker-compose.
+Testsuite requires docker-compose.
 
 ```
 cd tests/
 docker-compose up --build
-DEBUG=1 ./img-tests.sh
+```
+
+If everything went well, expect at the end:
+
+```
+linuxfr.org-img-test_1  | All tests looks good!
+tests_linuxfr.org-img-test_1 exited with code 0
 ```
 
 See also

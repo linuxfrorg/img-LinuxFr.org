@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#
+
 set -eu -o pipefail
 
 SCRIPT_DIR="$(dirname "$0")"
@@ -13,6 +13,10 @@ NGINX4="192.168.42.20"
 NGINX4_HEX="$(printf "%s" "${NGINX4}"|xxd -ps)"
 NGINX6="[fd42:3200:3200::20]"
 NGINX6_HEX="$(printf "%s" "${NGINX6}"|xxd -ps)"
+
+REDIS_CLI=(docker exec -i tests_redis_1 redis-cli)
+# without docker REDIS_CLI=(redis-cli -p 16379)
+HURL=(hurl)
 
 IMAGES_WITH_ONLY_IMG_ENTRY="http://badnginx.example.net/nowhere
 http://badnginx/nowhere
@@ -82,12 +86,12 @@ rm -rf -- "$CACHE_IMG"/[0-9a-f][0-9a-f]
 printf "Preload tests images in Redis\n"
 for img in $IMAGES
 do
-redis-cli -p 16379 > /dev/null <<EOF
+${REDIS_CLI[@]} > /dev/null <<EOF
 del img/$img img/updated/$img img/err/$img
 hset img/$img created_at $NOW
 EOF
 done
-redis-cli -p 16379 hset img/http://nginx/blocked.png status Blocked > /dev/null
+${REDIS_CLI[@]} hset img/http://nginx/blocked.png status Blocked > /dev/null
 
 # tests first fetch
 for ip in 4 6
@@ -95,7 +99,8 @@ do
   for http2 in false true
   do
     target="TARGET$ip"
-    hurl -$ip ${DEBUG:+-v} \
+    printf "Testing with IPv%s HTTP/2 %s\n" "${ip}" "${http2}"
+    ${HURL[@]} -$ip ${DEBUG:+-v} \
       --variable "TARGET=${!target}" \
       --variable "HTTP2=${http2}" \
       --variable "NGINX4=$NGINX4" \
@@ -110,7 +115,7 @@ done
 cp data-nginx/red_10000x10000.png data-nginx/red_100x100_changed_after_fetch.png
 rm data-nginx/red_100x100_removed_after_fetch.png
 cp data-nginx/red_100x100.gif data-nginx/red_100x100_converted_after_fetch.png
-redis-cli -p 16379 hset img/http://nginx/red_100x100_blocked_after_fetch.png status Blocked
+${REDIS_CLI[@]} hset img/http://nginx/red_100x100_blocked_after_fetch.png status Blocked
 
 # tests after first fetch
 
@@ -119,7 +124,8 @@ do
   for http2 in false true
   do
     target="TARGET$ip"
-    hurl -$ip ${DEBUG:+-v} \
+    printf "Testing with IPv%s HTTP/2 %s\n" "${ip}" "${http2}"
+    ${HURL[@]} -$ip ${DEBUG:+-v} \
       --variable "TARGET=${!target}" \
       --variable "HTTP2=${http2}" \
       --variable "NGINX4=$NGINX4" \
@@ -140,20 +146,20 @@ check() {
   fi
 }
 
-REDIS_IMG_ERR="$(redis-cli -p 16379 keys img/err/*|wc -l)"
+REDIS_IMG_ERR="$(${REDIS_CLI[@]} keys img/err/*|wc -l)"
 REDIS_IMG_ERR_EXPECTED="$(printf "%s\n" "$IMAGES_WITH_IMG_AND_ERR_ENTRIES"|wc -l)"
 check "img/err" "$REDIS_IMG_ERR" "$REDIS_IMG_ERR_EXPECTED"
 
-REDIS_IMG_UPDATED="$(redis-cli -p 16379 keys img/updated/*|wc -l)"
+REDIS_IMG_UPDATED="$(${REDIS_CLI[@]} keys img/updated/*|wc -l)"
 REDIS_IMG_UPDATED_EXPECTED="$(printf "%s\n" "$IMAGES_WITH_IMG_AND_UPDATED_ENTRIES"|wc -l)"
 check "img/updated" "$REDIS_IMG_UPDATED" "$REDIS_IMG_UPDATED_EXPECTED"
 
-REDIS_IMG_URI="$(redis-cli -p 16379 keys img/h*|wc -l)"
+REDIS_IMG_URI="$(${REDIS_CLI[@]} keys img/h*|wc -l)"
 REDIS_IMG_URI_ONLY="$(printf "%s\n" "$IMAGES_WITH_ONLY_IMG_ENTRY"|wc -l)"
 REDIS_IMG_URI_EXPECTED="$(( REDIS_IMG_ERR_EXPECTED + REDIS_IMG_UPDATED_EXPECTED + REDIS_IMG_URI_ONLY))"
 check "img/<uri>" "$REDIS_IMG_URI" "$REDIS_IMG_URI_EXPECTED"
 
-REDIS_ALL="$(redis-cli -p 16379 dbsize)"
+REDIS_ALL="$(${REDIS_CLI[@]} dbsize)"
 REDIS_ALL_EXPECTED="$(( REDIS_IMG_ERR_EXPECTED + REDIS_IMG_UPDATED_EXPECTED + REDIS_IMG_URI_EXPECTED ))"
 check "keys" "$REDIS_ALL" "$REDIS_ALL_EXPECTED"
 

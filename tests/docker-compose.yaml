@@ -53,6 +53,21 @@ services:
       - net.ipv6.conf.all.disable_ipv6=0
       - net.ipv6.conf.eth0.proxy_ndp=1
 
+  linuxfr.org-img-test:
+    build:
+      context: .
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock # to run Docker in Docker
+      - ./data-nginx:/tmp/data-nginx/
+      - ./cache-img:/tmp/cache-img/
+    networks:
+      ipv6_network:
+        ipv4_address: 192.168.42.70
+        ipv6_address: fd42:3200:3200::70
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+      - net.ipv6.conf.eth0.proxy_ndp=1
+
 volumes:
   data-redis:
     driver: local
