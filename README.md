@@ -43,6 +43,51 @@ Build and run Docker image:
     or
     $ docker run --publish 8000:8000 --env REDIS=someredis:6379/1 linuxfr.org-img
 
+How it works?
+-------------
+
+Accepted requests are:
+- `GET /status` (expected answer is HTTP 200 with "OK" body)
+- `GET /img/<encoded_uri>` or `GET /img/<encoded_uri>/<filename>`
+- `GET /avatars/<encoded_uri>` or `GET /avatars/<encoded_uri>/<filename>`
+
+where `<filename>` is the name given to the file, and `encoded_uri` is the `uri` converted into hexadecimal string.
+
+Example: `http://nginx/red_100x100.png` could be accessed as `GET /img/687474703A2F2F6E67696E782F7265645F313030783130302E706E67/square_red.png`
+
+```mermaid
+graph TD
+  A[ HTTP request ] --> B[ Status /status ]
+
+  B --> |GET| SA[ 200 ]
+  B --> |otherwise| SB[ 405 ]
+
+  A --> C[ Avatar /avatars/ or image /img/ ]
+  C --> AA[ bad/invalid path/method 40x]
+  C --> AC[ check url status]
+  AC --> AD[ undeclared image 404]
+  AC --> AE[ invalid URI 404]
+  AC --> AF[ admin block 404]
+  AC --> AG[ previous fetch in error 404]
+  AC --> AH[ fetch]
+  AH --> | first fetch | AI[ fetch from server]
+  AI --> | any DNS/TLS/HTTP error | AL[ answers 404]
+  AI --> | not a 200 | AM[ set in error and answers 404]
+  AI --> | too big content | AM
+  AI --> | content-type | AM
+  AI --> AN[manipulate aka resize if avatar]
+  AN --> AO[save in cache]
+  AO --> AJ[ serve from cache]
+  AH --> AJ
+  AH --> AK[ if error answers 404]
+```
+
+- HTTP 404s for avatars are converted into redirection to default avatar address.
+- `declared` means that `img/<uri>` in Redis contains a `created_at` field.
+- `admin block` means that `img/<uri>` in Redis contains a `status` field with "Blocked" value.
+- `set in error` means that `img/err/<uri>` in Redis exists.
+- `in cache` means that `img/updated/<uri>` in Redis exists.
+
 Why don't you use camo?
 -----------------------
 

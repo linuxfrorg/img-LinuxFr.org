@@ -104,7 +104,7 @@ var userAgent string
 // The address for avatars by default
 var defaultAvatarUrl string
 
-// Check if an URL is valid and not temporary in error
+// Check if an URL is valid and not temporarily in error
 func urlStatus(uri string) error {
 	hexists := connection.HExists("img/"+uri, "created_at")
 	if err := hexists.Err(); err != nil {
@@ -242,7 +242,7 @@ func saveImageInCache(uri string, contentType string, etag string, body []byte) 
 	return
 }
 
-// Save the error in redis for 10 minutes
+// Save the error in redis for the cache refresh interval duration
 func saveErrorInCache(uri string, err error) {
 	go func() {
 		connection.Set("img/err/"+uri, err.Error(), CacheRefreshInterval)
