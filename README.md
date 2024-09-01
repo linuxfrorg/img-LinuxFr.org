@@ -99,7 +99,8 @@ graph TD
   F --> |got 304| G[reset cache timer]
   F --> |got 200| H[save in cache]  
   F --> |img/err/uri| D
-  H --> |img/uri checksum| I[save on disk]
+  H --> |different checksum| I[save on disk]
+  H --> |same checksum| G
   I --> |img/uri type, checksum, etag| J[on disk]
   J --> G
   G --> |cache refresh interval| B
