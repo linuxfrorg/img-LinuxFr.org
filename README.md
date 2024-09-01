@@ -72,7 +72,7 @@ graph TD
   AC --> AH[ fetch]
   AH --> | first fetch | AI[ fetch from server]
   AI --> | any DNS/TLS/HTTP error | AL[ answers 404]
-  AI --> | not a 200 | AM[ set in error and answers 404]
+  AI --> | not a 200/304 | AM[ set in error and answers 404]
   AI --> | too big content | AM
   AI --> | content-type | AM
   AI --> AN[manipulate aka resize if avatar]
@@ -87,6 +87,23 @@ graph TD
 - `admin block` means that `img/<uri>` in Redis contains a `status` field with "Blocked" value.
 - `set in error` means that `img/err/<uri>` in Redis exists.
 - `in cache` means that `img/updated/<uri>` in Redis exists.
+
+```mermaid
+graph TD
+  A[ undeclared ] -->|img/uri created_at| B[declared]
+  B --> |img/uri status Blocked| C[ admin block]
+  B --> |img/err/uri| D[ in error ]
+  D --> |cache refresh interval| B
+  B --> |img/updated/uri exists| E[ serve from cache disk]
+  B --> |no img/updated/uri| F[fetch from server]
+  F --> |got 304| G[reset cache timer]
+  F --> |got 200| H[save in cache]  
+  F --> |img/err/uri| D
+  H --> |img/uri checksum| I[save on disk]
+  I --> |img/uri type, checksum, etag| J[on disk]
+  J --> G
+  G --> |cache refresh interval| B
+```
 
 Why don't you use camo?
 -----------------------
