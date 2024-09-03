@@ -106,7 +106,7 @@ var defaultAvatarUrl string
 
 // Check if an URL is valid and not temporarily in error
 func urlStatus(uri string) error {
-	hexists := connection.HExists("img/"+uri, "created_at")
+	hexists := connection.HExists("img/" + uri, "created_at")
 	if err := hexists.Err(); err != nil {
 		return err
 	}
@@ -114,7 +114,7 @@ func urlStatus(uri string) error {
 		return errors.New("Invalid URL")
 	}
 
-	hget := connection.HGet("img/"+uri, "status")
+	hget := connection.HGet("img/" + uri, "status")
 	if err := hget.Err(); err == nil {
 		if status := hget.Val(); status == "Blocked" {
 			return errors.New("Invalid URL")
@@ -124,6 +124,10 @@ func urlStatus(uri string) error {
 	get := connection.Get("img/err/" + uri)
 	if err := get.Err(); err == nil {
 		str := get.Val()
+		try := connection.HGet("img/" + uri, "checksum")
+		if try.Err() == nil && try.Val() != "" {
+			return nil // fallback on cache disk despite error
+		}
 		return errors.New(str)
 	}
 
@@ -169,7 +173,7 @@ func resetCacheTimer(uri string) {
 		log.Printf("Couldn't Get mtime while resetting cache timer for %s: %s\n", uri, err)
 		return
 	}
-	connection.Set("img/updated/"+uri, mtime, CacheRefreshInterval)
+	connection.Set("img/updated/" + uri, mtime, CacheRefreshInterval)
 }
 
 // Fetch image from cache
@@ -180,11 +184,16 @@ func fetchImageFromCache(uri string, behaviour Behaviour) (headers Headers, body
 	if exists.Err() != nil || !exists.Val() {
 		err = fetchImageFromServer(uri, behaviour)
 		if err != nil {
-			return
+			hget := connection.HGet("img/" + uri, "checksum")
+			if hget.Err() != nil || hget.Val() == "" {
+				return
+			} else {
+				log.Printf("Fail to fetch %s (serve from disk cache anyway): %s\n", uri)
+			}
 		}
 	}
 
-	hget := connection.HGet("img/"+uri, "type")
+	hget := connection.HGet("img/" + uri, "type")
 	if err = hget.Err(); err != nil {
 		return
 	}
@@ -207,7 +216,7 @@ func fetchImageFromCache(uri string, behaviour Behaviour) (headers Headers, body
 // Save the body and the content-type header in cache
 func saveImageInCache(uri string, contentType string, etag string, body []byte) (err error) {
 	checksum := generateChecksumForCache(body)
-	hget := connection.HGet("img/"+uri, "checksum")
+	hget := connection.HGet("img/" + uri, "checksum")
 	if err = hget.Err(); err == nil {
 		if was := hget.Val(); checksum == was {
 			resetCacheTimer(uri)
@@ -230,12 +239,12 @@ func saveImageInCache(uri string, contentType string, etag string, body []byte) 
 	}
 
 	// And other infos in redis
-	connection.HSet("img/"+uri, "type", contentType)
-	connection.HSet("img/"+uri, "checksum", checksum)
+	connection.HSet("img/" + uri, "type", contentType)
+	connection.HSet("img/" + uri, "checksum", checksum)
 	if etag == "" {
-		connection.HDel("img/"+uri, "etag")
+		connection.HDel("img/" + uri, "etag")
 	} else {
-		connection.HSet("img/"+uri, "etag", etag)
+		connection.HSet("img/" + uri, "etag", etag)
 	}
 	resetCacheTimer(uri)
 
@@ -245,7 +254,7 @@ func saveImageInCache(uri string, contentType string, etag string, body []byte) 
 // Save the error in redis for the cache refresh interval duration
 func saveErrorInCache(uri string, err error) {
 	go func() {
-		connection.Set("img/err/"+uri, err.Error(), CacheRefreshInterval)
+		connection.Set("img/err/" + uri, err.Error(), CacheRefreshInterval)
 	}()
 }
 
@@ -256,7 +265,7 @@ func fetchImageFromServer(uri string, behaviour Behaviour) (err error) {
 		log.Printf("Error on http.NewRequest GET %s: %s\n", uri, err)
 		return
 	}
-	hget := connection.HGet("img/"+uri, "etag")
+	hget := connection.HGet("img/" + uri, "etag")
 	if err = hget.Err(); err == nil {
 		etag := hget.Val()
 		req.Header.Set("If-None-Match", etag)

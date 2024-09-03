@@ -68,36 +68,40 @@ graph TD
   AC --> AD[ undeclared image 404]
   AC --> AE[ invalid URI 404]
   AC --> AF[ admin block 404]
-  AC --> AG[ previous fetch in error 404]
-  AC --> AH[ fetch]
-  AH --> | first fetch | AI[ fetch from server]
-  AI --> | any DNS/TLS/HTTP error | AL[ answers 404]
-  AI --> | not a 200/304 | AM[ set in error and answers 404]
-  AI --> | too big content | AM
-  AI --> | content-type | AM
-  AI --> AN[manipulate aka resize if avatar]
-  AN --> AO[save in cache]
-  AO --> AJ[ serve from cache]
-  AH --> AJ
-  AH --> AK[ if error answers 404]
+  AC --> AG[ already in cache]
+  AC --> AH[ previous fetch in error]
+  AH --> AL[ not in cache answers 404]
+  AH --> AK[ serve from cache]
+  AC --> AI[ fetch]
+  AI --> | first fetch | AJ[ fetch from server]
+  AJ --> | any DNS/TLS/HTTP error | AM[ answers 404]
+  AJ --> | not a 200/304 | AN[ set in error and answers 404]
+  AJ --> | too big content | AN
+  AJ --> | content-type | AN
+  AJ --> AO[manipulate aka resize if avatar]
+  AN --> AP[save in cache]
+  AO --> AK
 ```
 
 - HTTP 404s for avatars are converted into redirection to default avatar address.
 - `declared` means that `img/<uri>` in Redis contains a `created_at` field.
 - `admin block` means that `img/<uri>` in Redis contains a `status` field with "Blocked" value.
-- `set in error` means that `img/err/<uri>` in Redis exists.
-- `in cache` means that `img/updated/<uri>` in Redis exists.
+- `in error` means that `img/err/<uri>` in Redis exists and file is not in cache from a previous fetch.
+- `in cache` means that `img/<uri>` in Redis contains a `checksum` field. And if img/updated/<uri>` exists, the cache is up-to-date this remote server.
 
 ```mermaid
 graph TD
   A[ undeclared ] -->|img/uri created_at| B[declared]
   B --> |img/uri status Blocked| C[ admin block]
-  B --> |img/err/uri| D[ in error ]
+  B --> |img/err/uri| K[ fetch in error]
+  K --> |img/uri/checksum| E[ serve from cache disk]
+  K --> |not in cache| D[ in error ]
   D --> |cache refresh interval| B
-  B --> |img/updated/uri exists| E[ serve from cache disk]
+  B --> |img/updated/uri exists| E
   B --> |no img/updated/uri| F[fetch from server]
   F --> |got 304| G[reset cache timer]
   F --> |got 200| H[save in cache]  
+  F --> K
   F --> |img/err/uri| D
   H --> |different checksum| I[save on disk]
   H --> |same checksum| G
@@ -130,7 +134,7 @@ Redis schema
 Key                                            | Type   | Value                 | Expiration | Description
 ---------------------------------------------- | ------ | --------------------- | ---------- | -------------------
 `img/<uri>`                                    |  hash  |                       |     no     | Images, with fields 'created_at': seconds since Epoch, 'status': 'Blocked' if administratively blocked (by moderation), 'type': content-type like 'image/jpeg' (set by `img` daemon), 'checksum': SHA1 (set by `img` daemon), and 'etag': etag (set by `img` daemon)
-`img/err/<uri>`                                | string |         error         |     no     | Images in error, like "Invalid content-type", created by `img` daemon but removed by `dlfp`
+`img/err/<uri>`                                | string |         error         |     1h     | Image fetch in error, like "Invalid content-type"
 `img/updated/<uri>`                            | string |        modtime        |     1h     | Cached images, created by `img` daemon, value like "Thu, 12 Dec 2013 12:28:47 GMT"
 
 Testsuite
