@@ -27,7 +27,7 @@ How to use it? (outside Docker)
 [Install Go](http://golang.org/doc/install) and don't forget to set `$GOPATH`
 
     $ go get -v -u github.com/linuxfrorg/img-LinuxFr.org
-    $ img-LinuxFr.org [-a addr] [-r redis] [-l log] [-d dir] [-u agent] [-e avatar]
+    $ img-LinuxFr.org [-a addr] [-r redis] [-l log] [-d dir] [-u agent] [-e avatar] [-c]
 
 And, to display the help:
 
@@ -110,23 +110,6 @@ graph TD
   G --> |cache refresh interval| B
 ```
 
-Why don't you use camo?
------------------------
-
-(answer from Bruno Michel, in 2012)
-
-Github has developed a similar service, [camo](https://github.com/atmos/camo),
-for their own usage.
-I used it as a source of inspiration but I prefered to redevelop a new service
-instead of using it for several reasons:
-
-- It lacks some feature and particulary caching!
-- It runs with a legacy version of node.js, which is not very friendly for our
-  sysadmins.
-- I plan to extend it for other usages in the future, and I prefer coding in
-  golang than in nodejs.
-- And it's a fun component to recode :p
-
 Redis schema
 ------------
 (extracted from [full LinuxFr.org Redis schema](https://github.com/linuxfrorg/linuxfr.org/blob/master/db/redis.txt))
@@ -134,7 +117,9 @@ Redis schema
 Key                                            | Type   | Value                 | Expiration | Description
 ---------------------------------------------- | ------ | --------------------- | ---------- | -------------------
 `img/<uri>`                                    |  hash  |                       |     no     | Images, with fields 'created_at': seconds since Epoch, 'status': 'Blocked' if administratively blocked (by moderation), 'type': content-type like 'image/jpeg' (set by `img` daemon), 'checksum': SHA1 (set by `img` daemon), and 'etag': etag (set by `img` daemon)
-`img/err/<uri>`                                | string |         error         |     1h     | Image fetch in error, like "Invalid content-type"
+`img/blocked`                                  |  list  |         URIs          |     no     | Images blocked by moderation team
+`img/err/<uri>`                                | string |         error         |     1h     | Image fetch in error, like "Invalid content-type", created by `img` daemon
+`img/latest`                                   |  list  |         URIs          | no, limited| Last images as `<uri>`, limited to NB_IMG_IN_LATEST = 100
 `img/updated/<uri>`                            | string |        modtime        |     1h     | Cached images, created by `img` daemon, value like "Thu, 12 Dec 2013 12:28:47 GMT"
 
 Testsuite
@@ -164,4 +149,5 @@ Copyright
 The code is licensed as GNU AGPLv3. See the LICENSE file for the full license.
 
 ♡2012-2018 by Bruno Michel. Copying is an act of love. Please copy and share.
+
 2022-2024 by Benoît Sibaud and Adrien Dorsaz.

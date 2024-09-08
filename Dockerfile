@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Build
-FROM docker.io/golang:1.23.0-alpine AS build
+FROM docker.io/golang:1.23.1-alpine AS build
 
 WORKDIR /app
 
@@ -14,8 +14,8 @@ COPY *.go ./
 RUN go build -trimpath -o /img-LinuxFr.org
 
 RUN go install golang.org/x/vuln/cmd/govulncheck@latest
-RUN govulncheck ./...
-RUN govulncheck --mode=binary /img-LinuxFr.org
+RUN govulncheck -show verbose ./...
+RUN govulncheck -show verbose --mode=binary /img-LinuxFr.org
 
 RUN apk add tzdata
 
