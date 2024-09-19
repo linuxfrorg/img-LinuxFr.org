@@ -17,12 +17,13 @@ NGINX6_HEX="$(printf "%s" "${NGINX6}"|xxd -ps)"
 REDIS_CLI=(docker exec -i tests_redis_1 redis-cli)
 # without docker REDIS_CLI=(redis-cli -p 16379)
 HURL=(hurl)
+SANITY=(docker exec -i tests_linuxfr.org-img_1 /img-LinuxFr.org -r redis:6379/0 -d cache -l - -c)
 
 IMAGES_WITH_ONLY_IMG_ENTRY_NO_CACHE="http://badnginx.example.net/nowhere
 http://badnginx/nowhere
 http://nginx:81/closed_port
-http://nginx/redirectloop
-http://nginx/blocked.png"
+http://nginx/redirectloop"
+IMAGES_WITH_ONLY_IMG_ENTRY_NO_CACHE_AND_BLOCKED="http://nginx/blocked.png"
 IMAGES_WITH_ONLY_IMG_ENTRY_STILL_IN_CACHE="http://nginx/red_100x100_blocked_after_fetch.png"
 
 IMAGES_WITH_IMG_AND_ERR_ENTRIES_NO_CACHE="http://nginx/bad_content.html
@@ -79,6 +80,7 @@ cp data-nginx/red_100x100.png data-nginx/red_100x100_blocked_after_fetch.png
 
 IMAGES="$IMAGES_WITH_IMG_AND_UPDATED_ENTRIES
 $IMAGES_WITH_ONLY_IMG_ENTRY_NO_CACHE
+$IMAGES_WITH_ONLY_IMG_ENTRY_NO_CACHE_AND_BLOCKED
 $IMAGES_WITH_ONLY_IMG_ENTRY_STILL_IN_CACHE
 $IMAGES_WITH_IMG_AND_ERR_ENTRIES_NO_CACHE
 $IMAGES_WITH_IMG_AND_ERR_ENTRIES_STILL_IN_CACHE"
@@ -90,11 +92,18 @@ printf "Preload tests images in Redis\n"
 for img in $IMAGES
 do
 ${REDIS_CLI[@]} > /dev/null <<EOF
-del img/$img img/updated/$img img/err/$img
-hset img/$img created_at $NOW
+DEL img/$img img/updated/$img img/err/$img img/latest img/blocked
+HSET img/$img created_at $NOW
+LPUSH img/latest $img
 EOF
 done
-${REDIS_CLI[@]} hset img/http://nginx/blocked.png status Blocked > /dev/null
+for img in $IMAGES_WITH_ONLY_IMG_ENTRY_NO_CACHE_AND_BLOCKED
+do
+${REDIS_CLI[@]} > /dev/null <<EOF
+HSET img/$img status Blocked
+LPUSH img/blocked $img
+EOF
+done
 
 hurl_tests()
 {
@@ -123,7 +132,8 @@ hurl_tests tests_misc.hurl tests_img.hurl tests_avatars.hurl
 cp data-nginx/red_10000x10000.png data-nginx/red_100x100_changed_after_fetch.png
 rm data-nginx/red_100x100_removed_after_fetch.png
 cp data-nginx/red_100x100.gif data-nginx/red_100x100_converted_after_fetch.png
-${REDIS_CLI[@]} hset img/http://nginx/red_100x100_blocked_after_fetch.png status Blocked
+${REDIS_CLI[@]} HSET img/http://nginx/red_100x100_blocked_after_fetch.png status Blocked
+${REDIS_CLI[@]} LPUSH img/blocked http://nginx/red_100x100_blocked_after_fetch.png > /dev/null
 
 # tests after first fetch but before cache expiration
 hurl_tests tests_img_after_fetch_before_cache_expiration.hurl
@@ -136,7 +146,7 @@ for img in \
 "http://nginx/red_100x100_removed_after_fetch.png"
 do
 ${REDIS_CLI[@]} > /dev/null <<EOF
-del img/updated/$img
+DEL img/updated/$img
 EOF
 done
 
@@ -153,26 +163,63 @@ check() {
   fi
 }
 
-REDIS_IMG_ERR="$(${REDIS_CLI[@]} keys img/err/*|wc -l)"
+REDIS_IMG_ERR="$(${REDIS_CLI[@]} KEYS img/err/*|wc -l)"
 REDIS_IMG_ERR_EXPECTED_NO_CACHE="$(printf "%s\n" "$IMAGES_WITH_IMG_AND_ERR_ENTRIES_NO_CACHE"|wc -l)"
 REDIS_IMG_ERR_EXPECTED_STILL_IN_CACHE="$(printf "%s\n" "$IMAGES_WITH_IMG_AND_ERR_ENTRIES_STILL_IN_CACHE"|wc -l)"
 check "img/err" "$REDIS_IMG_ERR" "$(( REDIS_IMG_ERR_EXPECTED_NO_CACHE + REDIS_IMG_ERR_EXPECTED_STILL_IN_CACHE ))"
 
-REDIS_IMG_UPDATED="$(${REDIS_CLI[@]} keys img/updated/*|wc -l)"
+REDIS_IMG_UPDATED="$(${REDIS_CLI[@]} KEYS img/updated/*|wc -l)"
 REDIS_IMG_UPDATED_EXPECTED="$(printf "%s\n" "$IMAGES_WITH_IMG_AND_UPDATED_ENTRIES"|wc -l)"
 check "img/updated" "$REDIS_IMG_UPDATED" "$REDIS_IMG_UPDATED_EXPECTED"
 
-REDIS_IMG_URI="$(${REDIS_CLI[@]} keys img/h*|wc -l)"
+REDIS_IMG_URI="$(${REDIS_CLI[@]} KEYS img/h*|wc -l)"
 REDIS_IMG_URI_ONLY_NO_CACHE="$(printf "%s\n" "$IMAGES_WITH_ONLY_IMG_ENTRY_NO_CACHE"|wc -l)"
+REDIS_IMG_URI_ONLY_NO_CACHE_AND_BLOCKED="$(printf "%s\n" "$IMAGES_WITH_ONLY_IMG_ENTRY_NO_CACHE_AND_BLOCKED"|wc -l)"
 REDIS_IMG_URI_ONLY_STILL_IN_CACHE="$(printf "%s\n" "$IMAGES_WITH_ONLY_IMG_ENTRY_STILL_IN_CACHE"|wc -l)"
-REDIS_IMG_URI_EXPECTED="$(( REDIS_IMG_ERR_EXPECTED_NO_CACHE + REDIS_IMG_ERR_EXPECTED_STILL_IN_CACHE + REDIS_IMG_UPDATED_EXPECTED + REDIS_IMG_URI_ONLY_NO_CACHE + REDIS_IMG_URI_ONLY_STILL_IN_CACHE ))"
+REDIS_IMG_URI_EXPECTED="$(( REDIS_IMG_ERR_EXPECTED_NO_CACHE + REDIS_IMG_ERR_EXPECTED_STILL_IN_CACHE + REDIS_IMG_UPDATED_EXPECTED + REDIS_IMG_URI_ONLY_NO_CACHE + REDIS_IMG_URI_ONLY_NO_CACHE_AND_BLOCKED + REDIS_IMG_URI_ONLY_STILL_IN_CACHE ))"
 check "img/<uri>" "$REDIS_IMG_URI" "$REDIS_IMG_URI_EXPECTED"
 
-REDIS_ALL="$(${REDIS_CLI[@]} dbsize)"
-REDIS_ALL_EXPECTED="$(( REDIS_IMG_ERR_EXPECTED_NO_CACHE + REDIS_IMG_ERR_EXPECTED_STILL_IN_CACHE + REDIS_IMG_UPDATED_EXPECTED + REDIS_IMG_URI_EXPECTED ))"
+REDIS_ALL="$(${REDIS_CLI[@]} DBSIZE)"
+REDIS_IMG_LATEST=1
+REDIS_IMG_BLOCKED=1
+REDIS_ALL_EXPECTED="$(( 2 * REDIS_IMG_ERR_EXPECTED_NO_CACHE + 2 * REDIS_IMG_ERR_EXPECTED_STILL_IN_CACHE + 2 * REDIS_IMG_UPDATED_EXPECTED + REDIS_IMG_URI_ONLY_NO_CACHE + REDIS_IMG_URI_ONLY_NO_CACHE_AND_BLOCKED + REDIS_IMG_URI_ONLY_STILL_IN_CACHE + REDIS_IMG_LATEST + REDIS_IMG_BLOCKED ))"
 check "keys" "$REDIS_ALL" "$REDIS_ALL_EXPECTED"
 
 CACHE_ENTRIES="$(find cache-img -type f|wc -l)"
 check "cache entries" "$CACHE_ENTRIES" "$(( REDIS_IMG_UPDATED + REDIS_IMG_ERR_EXPECTED_STILL_IN_CACHE + REDIS_IMG_URI_ONLY_STILL_IN_CACHE ))"
+
+printf "Cleanup before sanity check, ie. remove broken test images\n"
+for img in $IMAGES_WITH_ONLY_IMG_ENTRY_NO_CACHE
+do
+${REDIS_CLI[@]} > /dev/null <<EOF
+DEL img/$img
+LREM "img/latest" 1 "$img"
+EOF
+done
+for img in $IMAGES_WITH_ONLY_IMG_ENTRY_NO_CACHE_AND_BLOCKED
+do
+${REDIS_CLI[@]} > /dev/null <<EOF
+DEL img/$img
+LREM "img/latest" 1 "$img"
+LREM "img/blocked" 1 "$img"
+EOF
+done
+for img in $IMAGES_WITH_IMG_AND_ERR_ENTRIES_NO_CACHE
+do
+${REDIS_CLI[@]} > /dev/null <<EOF
+DEL img/$img img/err/$img
+LREM "img/latest" 1 "$img"
+EOF
+done
+for img in $IMAGES_WITH_ONLY_IMG_ENTRY_STILL_IN_CACHE
+do
+${REDIS_CLI[@]} > /dev/null <<EOF
+HDEL img/$img status
+LREM "img/blocked" 1 "$img"
+EOF
+done
+
+printf "Sanity check"
+${SANITY[@]}
 
 printf "All tests looks good!\n"
