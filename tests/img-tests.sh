@@ -222,4 +222,4 @@ done
 printf "Sanity check"
 ${SANITY[@]}
 
-printf "All tests looks good!\n"
+printf "All tests look good!\n"
