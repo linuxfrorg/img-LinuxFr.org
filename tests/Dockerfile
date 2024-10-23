@@ -13,6 +13,6 @@ COPY img-tests.sh ./
 
 RUN apk add --no-cache bash coreutils docker xxd
 
-RUN mkdir -p nginx-data cache-img
+RUN mkdir -p cache-img
 
 ENTRYPOINT /tmp/img-tests.sh

@@ -13,11 +13,11 @@ COPY *.go ./
 
 RUN go build -trimpath -o /img-LinuxFr.org
 
-RUN go install golang.org/x/vuln/cmd/govulncheck@latest
-RUN govulncheck -show verbose ./...
-RUN govulncheck -show verbose --mode=binary /img-LinuxFr.org
+RUN go install golang.org/x/vuln/cmd/govulncheck@latest \
+    && govulncheck -show verbose ./... \
+    && govulncheck -show verbose --mode=binary /img-LinuxFr.org
 
-RUN apk add tzdata
+RUN apk add --no-cache tzdata
 
 # Deploy
 FROM docker.io/alpine
