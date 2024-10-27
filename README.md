@@ -126,7 +126,7 @@ Testsuite
 ---------
 Testsuite requires docker-compose.
 
-```
+```bash
 cd tests/
 docker-compose up --build
 ```
@@ -136,6 +136,14 @@ If everything went well, expect at the end:
 ```
 linuxfr.org-img-test_1  | All tests looks good!
 tests_linuxfr.org-img-test_1 exited with code 0
+```
+
+Extra checks (linter for Dockefile and vulnerability/secret scan):
+
+```bash
+docker run --rm -i hadolint/hadolint < Dockerfile
+docker run --rm -i hadolint/hadolint < tests/Dockerfile
+docker run --rm aquasec/trivy repo .
 ```
 
 See also
