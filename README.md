@@ -138,6 +138,14 @@ linuxfr.org-img-test_1  | All tests looks good!
 tests_linuxfr.org-img-test_1 exited with code 0
 ```
 
+Extra checks (linter for Dockefile and vulnerability/secret scan):
+
+```
+docker run --rm -i hadolint/hadolint < Dockerfile
+docker run --rm -i hadolint/hadolint < tests/Dockerfile
+docker run --rm aquasec/trivy repo .
+```
+
 See also
 --------
 
