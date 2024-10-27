@@ -4,81 +4,89 @@ set -eu -o pipefail
 
 SCRIPT_DIR="$(dirname "$0")"
 CACHE_IMG="${SCRIPT_DIR}/cache-img"
+WEB_DIR="${SCRIPT_DIR}/data-web"
 NOW="$(date -u "+%s")"
 
-# IPs from Docker compose file
-# shellcheck disable=SC2034
-TARGET4="192.168.42.40"        # img IPv4
-# shellcheck disable=SC2034
-TARGET6="[fd42:3200:3200::40]" # img IPv6
-NGINX4="192.168.42.20"
-NGINX4_HEX="$(printf "%s" "${NGINX4}"|xxd -ps)"
-NGINX6="[fd42:3200:3200::20]"
-NGINX6_HEX="$(printf "%s" "${NGINX6}"|xxd -ps)"
+# Hosts from Docker compose file
+IMG="linuxfr.org-img"
+WEB="nginx"
+REDIS="redis"
 
-REDIS_CLI=(docker exec -i tests_redis_1 redis-cli)
+WEB_HEX="$(printf "%s" "${WEB}"|xxd -ps)"
+# shellcheck disable=SC2034
+TARGET4="$(dig "${IMG}" A +short)" # img IPv4
+# shellcheck disable=SC2034
+TARGET6="[$(dig "${IMG}" AAAA +short)]" # img IPv6
+WEB4="$(dig "${WEB}" A +short)"
+WEB4_HEX="$(printf "%s" "${WEB4}"|xxd -ps)"
+WEB6="[$(dig "${WEB}" AAAA +short)]"
+WEB6_HEX="$(printf "%s" "${WEB6}"|xxd -ps)"
+
+REDIS_CLI=(docker exec -i "tests_${REDIS}_1" redis-cli)
 # without docker REDIS_CLI=(redis-cli -p 16379)
 HURL=(hurl)
-SANITY=(docker exec -i tests_linuxfr.org-img_1 /img-LinuxFr.org -r redis:6379/0 -d cache -l - -c)
+SANITY=(docker exec -i "tests_${IMG}_1" /img-LinuxFr.org -r "${REDIS}:6379/0" -d cache -l - -c)
 
-IMAGES_WITH_ONLY_IMG_ENTRY_NO_CACHE="http://badnginx.example.net/nowhere
-http://badnginx/nowhere
-http://nginx:81/closed_port
-http://nginx/redirectloop"
-IMAGES_WITH_ONLY_IMG_ENTRY_NO_CACHE_AND_BLOCKED="http://nginx/blocked.png"
-IMAGES_WITH_ONLY_IMG_ENTRY_STILL_IN_CACHE="http://nginx/red_100x100_blocked_after_fetch.png"
+IMAGES_WITH_ONLY_IMG_ENTRY_NO_CACHE="http://bad${WEB}.example.net/nowhere
+http://bad${WEB}/nowhere
+http://${WEB}:81/closed_port
+http://${WEB}/redirectloop"
+IMAGES_WITH_ONLY_IMG_ENTRY_NO_CACHE_AND_BLOCKED="http://${WEB}/blocked.png"
+IMAGES_WITH_ONLY_IMG_ENTRY_STILL_IN_CACHE="http://${WEB}/red_100x100_blocked_after_fetch.png"
 
-IMAGES_WITH_IMG_AND_ERR_ENTRIES_NO_CACHE="http://nginx/bad_content.html
-http://nginx/bad_content.php
-http://nginx/bad_content.sh
-http://nginx/bad_content.txt
-http://nginx/forbidden.png
-http://nginx/non_existing
-http://nginx/random_2000x2000.png
-http://nginx/status400
-http://nginx/status401
-http://nginx/status409
-http://nginx/status410
-http://nginx/status412
-http://nginx/status415
-http://nginx/status422
-http://nginx/status429
-http://nginx/status436
-http://nginx/status441
-http://nginx/status500
-http://nginx/status501
-http://nginx/status502
-http://nginx/status503
-http://nginx/status504
-http://nginx/status520
-http://nginx/status525
-http://nginx/status530
-http://nginx/status666"
-IMAGES_WITH_IMG_AND_ERR_ENTRIES_STILL_IN_CACHE="http://nginx/red_100x100_removed_after_fetch.png"
+IMAGES_WITH_IMG_AND_ERR_ENTRIES_NO_CACHE="http://${WEB}/bad_content.html
+http://${WEB}/bad_content.php
+http://${WEB}/bad_content.sh
+http://${WEB}/bad_content.txt
+http://${WEB}/forbidden.png
+http://${WEB}/non_existing
+http://${WEB}/random_2000x2000.png
+http://${WEB}/status400
+http://${WEB}/status401
+http://${WEB}/status409
+http://${WEB}/status410
+http://${WEB}/status412
+http://${WEB}/status415
+http://${WEB}/status422
+http://${WEB}/status429
+http://${WEB}/status436
+http://${WEB}/status441
+http://${WEB}/status500
+http://${WEB}/status501
+http://${WEB}/status502
+http://${WEB}/status503
+http://${WEB}/status504
+http://${WEB}/status520
+http://${WEB}/status525
+http://${WEB}/status530
+http://${WEB}/status666"
+IMAGES_WITH_IMG_AND_ERR_ENTRIES_STILL_IN_CACHE="http://${WEB}/red_100x100_removed_after_fetch.png"
 
-IMAGES_WITH_IMG_AND_UPDATED_ENTRIES="http://nginx/red_10000x10000.png
-http://nginx/red_100x100.avif
-http://nginx/red_100x100.bmp
-http://nginx/red_100x100.gif
-http://nginx/red_100x100.jpeg
-http://nginx/red_100x100.jpg
-http://nginx/red_100x100.png
-http://nginx/red_100x100_changed_after_fetch.png
-http://nginx/red_100x100_converted_after_fetch.png
-http://nginx/red_100x100.svg
-http://nginx/red_100x100.tiff
-http://nginx/red_100x100.webp
-http://${NGINX4}/blue_100x100.png
-http://${NGINX6}/green_100x100.png
-http://nginx/status301
-http://nginx/status302
-http://nginx/status308"
+IMAGES_WITH_IMG_AND_UPDATED_ENTRIES="http://${WEB}/red_10000x10000.png
+http://${WEB}/red_100x100.avif
+http://${WEB}/red_100x100.bmp
+http://${WEB}/red_100x100.gif
+http://${WEB}/red_100x100.jpeg
+http://${WEB}/red_100x100.jpg
+http://${WEB}/red_100x100.png
+http://${WEB}/red_100x100_changed_after_fetch.png
+http://${WEB}/red_100x100_converted_after_fetch.png
+http://${WEB}/red_100x100.svg
+http://${WEB}/red_100x100.tiff
+http://${WEB}/red_100x100.webp
+http://${WEB4}/blue_100x100.png
+http://${WEB6}/green_100x100.png
+http://${WEB}/status301
+http://${WEB}/status302
+http://${WEB}/extraname
+http://${WEB}/extrafield
+http://${WEB}/status308"
 
 printf "Prepare/restore images altered after first fetch\n"
-cp data-nginx/red_100x100.png data-nginx/red_100x100_removed_after_fetch.png
-cp data-nginx/red_100x100.png data-nginx/red_100x100_changed_after_fetch.png
-cp data-nginx/red_100x100.png data-nginx/red_100x100_converted_after_fetch.png
-cp data-nginx/red_100x100.png data-nginx/red_100x100_blocked_after_fetch.png
+cp "${WEB_DIR}/red_100x100.png" "${WEB_DIR}/red_100x100_removed_after_fetch.png"
+cp "${WEB_DIR}/red_100x100.png" "${WEB_DIR}/red_100x100_changed_after_fetch.png"
+cp "${WEB_DIR}/red_100x100.png" "${WEB_DIR}/red_100x100_converted_after_fetch.png"
+cp "${WEB_DIR}/red_100x100.png" "${WEB_DIR}/red_100x100_blocked_after_fetch.png"
 
 IMAGES="$IMAGES_WITH_IMG_AND_UPDATED_ENTRIES
 $IMAGES_WITH_ONLY_IMG_ENTRY_NO_CACHE
@@ -118,10 +126,13 @@ hurl_tests()
       "${HURL[@]}" -$ip ${DEBUG:+-v} \
         --variable "TARGET=${!target}" \
         --variable "HTTP2=${http2}" \
-        --variable "NGINX4=$NGINX4" \
-        --variable "NGINX4_HEX=$NGINX4_HEX" \
-        --variable "NGINX6=$NGINX6" \
-        --variable "NGINX6_HEX=$NGINX6_HEX" \
+        --variable "WEB=${WEB}" \
+        --variable "WEB_HEX=${WEB_HEX}" \
+        --variable "WEB4_HEX=${WEB4_HEX}" \
+        --variable "WEB4=${WEB4}" \
+        --variable "WEB4_HEX=${WEB4_HEX}" \
+        --variable "WEB6=${WEB6}" \
+        --variable "WEB6_HEX=${WEB6_HEX}" \
         --test "$@"
     done
   done
@@ -131,21 +142,21 @@ hurl_tests()
 hurl_tests tests_misc.hurl tests_img.hurl tests_avatars.hurl
 
 # alter images after first fetch
-cp data-nginx/red_10000x10000.png data-nginx/red_100x100_changed_after_fetch.png
-rm data-nginx/red_100x100_removed_after_fetch.png
-cp data-nginx/red_100x100.gif data-nginx/red_100x100_converted_after_fetch.png
-"${REDIS_CLI[@]}" HSET img/http://nginx/red_100x100_blocked_after_fetch.png status Blocked
-"${REDIS_CLI[@]}" LPUSH img/blocked http://nginx/red_100x100_blocked_after_fetch.png > /dev/null
+cp "${WEB_DIR}/red_10000x10000.png" "${WEB_DIR}/red_100x100_changed_after_fetch.png"
+rm "${WEB_DIR}/red_100x100_removed_after_fetch.png"
+cp "${WEB_DIR}/red_100x100.gif" "${WEB_DIR}/red_100x100_converted_after_fetch.png"
+"${REDIS_CLI[@]}" HSET img/http://${WEB}/red_100x100_blocked_after_fetch.png status Blocked
+"${REDIS_CLI[@]}" LPUSH img/blocked http://${WEB}/red_100x100_blocked_after_fetch.png > /dev/null
 
 # tests after first fetch but before cache expiration
 hurl_tests tests_img_after_fetch_before_cache_expiration.hurl
 
 # alter images after first fetch to trigger cache expiration
 for img in \
-"http://nginx/red_100x100_blocked_after_fetch.png" \
-"http://nginx/red_100x100_changed_after_fetch.png" \
-"http://nginx/red_100x100_converted_after_fetch.png" \
-"http://nginx/red_100x100_removed_after_fetch.png"
+"http://${WEB}/red_100x100_blocked_after_fetch.png" \
+"http://${WEB}/red_100x100_changed_after_fetch.png" \
+"http://${WEB}/red_100x100_converted_after_fetch.png" \
+"http://${WEB}/red_100x100_removed_after_fetch.png"
 do
 "${REDIS_CLI[@]}" > /dev/null <<EOF
 DEL img/updated/$img

@@ -2,7 +2,11 @@
 
 FROM ghcr.io/orange-opensource/hurl:5.0.1
 
-WORKDIR /tmp
+LABEL "org.opencontainers.image.source"="https://github.com/linuxfrorg/img-LinuxFr.org"
+LABEL "org.opencontainers.image.description"="Tests suite for reverse-proxy cache for external domains on LinuxFr.org"
+LABEL "org.opencontainers.image.licenses"="AGPL-3.0-only"
+
+WORKDIR /app
 
 COPY tests_misc.hurl ./
 COPY tests_img.hurl ./
@@ -17,7 +21,8 @@ RUN apk add --no-cache \
       docker=20.10.24-r2 \
       xxd=9.0.0999-r0 \
       shellcheck=0.8.0-r1 \
-    && shellcheck /tmp/img-tests.sh \
+      bind-tools=9.18.24-r0 \
+    && shellcheck /app/img-tests.sh \
     && mkdir -p cache-img
 
-ENTRYPOINT ["/tmp/img-tests.sh"]
+ENTRYPOINT ["/app/img-tests.sh"]

@@ -25,6 +25,9 @@ services:
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=0
       - net.ipv6.conf.eth0.proxy_ndp=1
+    depends_on:
+      redis:
+        condition: service_started
 
   redis:
     image: redis:5
@@ -43,7 +46,7 @@ services:
   nginx:
     image: nginx:1.25.4
     volumes:
-      - ./data-nginx:/usr/share/nginx/html
+      - ./data-web:/usr/share/nginx/html
       - ./nginx.conf:/etc/nginx/conf.d/default.conf
     networks:
       ipv6_network:
@@ -58,8 +61,8 @@ services:
       context: .
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock # to run Docker in Docker
-      - ./data-nginx:/tmp/data-nginx/
-      - ./cache-img:/tmp/cache-img/
+      - ./data-web:/app/data-web/
+      - ./cache-img:/app/cache-img/
     networks:
       ipv6_network:
         ipv4_address: 192.168.42.70
@@ -67,6 +70,13 @@ services:
     sysctls:
       - net.ipv6.conf.all.disable_ipv6=0
       - net.ipv6.conf.eth0.proxy_ndp=1
+    depends_on:
+      redis:
+        condition: service_started
+      nginx:
+        condition: service_started
+      linuxfr.org-img:
+        condition: service_started
 
 volumes:
   data-redis:
