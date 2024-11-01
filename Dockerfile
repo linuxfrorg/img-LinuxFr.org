@@ -23,6 +23,10 @@ RUN apk add --no-cache tzdata=2024b-r0
 FROM docker.io/alpine:3.20.3
 USER 1000
 
+LABEL "org.opencontainers.image.source"="https://github.com/linuxfrorg/img-LinuxFr.org"
+LABEL "org.opencontainers.image.description"="Reverse-proxy cache for external domains on LinuxFr.org"
+LABEL "org.opencontainers.image.licenses"="AGPL-3.0-only"
+
 WORKDIR /
 
 COPY --from=build /usr/share/zoneinfo /usr/share/zoneinfo

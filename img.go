@@ -12,7 +12,6 @@ import (
 	"image/jpeg"
 	"image/png"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -75,11 +74,11 @@ var AvatarBehaviour = Behaviour{
 		var buf bytes.Buffer
 		switch format {
 		case "png":
-			png.Encode(&buf, m)
+			err = png.Encode(&buf, m)
 		case "jpeg":
-			jpeg.Encode(&buf, m, nil)
+			err = jpeg.Encode(&buf, m, nil)
 		}
-		if buf.Len() == 0 {
+		if err != nil || buf.Len() == 0 {
 			return body
 		}
 		return buf.Bytes()
@@ -136,13 +135,16 @@ func urlStatus(uri string) error {
 }
 
 // Generate a key for cache from a string
-func generateKeyForCache(s string) string {
+func generateKeyForCache(s string) (string, error) {
 	h := sha1.New()
-	io.WriteString(h, s)
+	_, err := io.WriteString(h, s)
+	if err != nil {
+		return "", errors.New("Unable to generate key for cache")
+	}
 	key := h.Sum(nil)
 
 	// Use 3 levels of hashing to avoid having too many files in the same directory
-	return fmt.Sprintf("%s/%x/%x/%x/%x", directory, key[0:1], key[1:2], key[2:3], key[3:])
+	return fmt.Sprintf("%s/%x/%x/%x/%x", directory, key[0:1], key[1:2], key[2:3], key[3:]), nil
 }
 
 // Generate a checksum for cache from a string
@@ -154,7 +156,10 @@ func generateChecksumForCache(body []byte) string {
 
 // Retrieve mtime of the cached file
 func getModTime(uri string) (modTime string, err error) {
-	filename := generateKeyForCache(uri)
+	filename, err := generateKeyForCache(uri)
+	if err != nil {
+		return
+	}
 	stat, err := os.Stat(filename)
 	if err != nil {
 		return
@@ -179,8 +184,6 @@ func resetCacheTimer(uri string) {
 
 // Fetch image from cache
 func fetchImageFromCache(uri string, behaviour Behaviour) (headers Headers, body []byte, err error) {
-	err = nil
-
 	exists := connection.Exists("img/updated/" + uri)
 	if exists.Err() != nil || !exists.Val() {
 		err = fetchImageFromServer(uri, behaviour)
@@ -200,7 +203,10 @@ func fetchImageFromCache(uri string, behaviour Behaviour) (headers Headers, body
 	}
 	contentType := hget.Val()
 
-	filename := generateKeyForCache(uri)
+	filename, err := generateKeyForCache(uri)
+	if err != nil {
+		return
+	}
 	lastModified, err := getModTime(uri)
 	if err != nil {
 		return
@@ -209,7 +215,7 @@ func fetchImageFromCache(uri string, behaviour Behaviour) (headers Headers, body
 	headers.contentType = contentType
 	headers.lastModified = lastModified
 
-	body, err = ioutil.ReadFile(filename)
+	body, err = os.ReadFile(filename)
 
 	return
 }
@@ -225,7 +231,10 @@ func saveImageInCache(uri string, contentType string, etag string, body []byte) 
 		}
 	}
 
-	filename := generateKeyForCache(uri)
+	filename, err := generateKeyForCache(uri)
+	if err != nil {
+		return
+	}
 	dirname := path.Dir(filename)
 	err = os.MkdirAll(dirname, 0755)
 	if err != nil {
@@ -233,7 +242,7 @@ func saveImageInCache(uri string, contentType string, etag string, body []byte) 
 	}
 
 	// Save the body on disk
-	err = ioutil.WriteFile(filename, body, 0644)
+	err = os.WriteFile(filename, body, 0644)
 	if err != nil {
 		log.Printf("Error while writing %s\n", filename)
 		return
@@ -297,19 +306,21 @@ func fetchImageFromServer(uri string, behaviour Behaviour) (err error) {
 		saveErrorInCache(uri, err)
 		return
 	}
-	contentType := res.Header.Get("Content-Type")
-	if len(contentType) < 5 || contentType[0:5] != "image" {
-		log.Printf("%s has an invalid content-type: %s\n", uri, contentType)
+	fullContentType := res.Header.Get("Content-Type")
+	if len(fullContentType) < 5 || fullContentType[0:5] != "image" {
+		log.Printf("%s has an invalid content-type: %s\n", uri, fullContentType)
 		err = errors.New("Invalid content-type")
 		saveErrorInCache(uri, err)
 		return
 	}
+	contentType,_,_ := strings.Cut(fullContentType, ";")
+
 	etag := res.Header.Get("ETag")
 	log.Printf("Fetch %s (%s) (ETag: %s)\n", uri, contentType, etag)
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		log.Printf("Error on ioutil.ReadAll for %s: %s\n", uri, err)
+		log.Printf("Error on io.ReadAll for %s: %s\n", uri, err)
 		return
 	}
 
@@ -357,7 +368,11 @@ func Image(w http.ResponseWriter, r *http.Request, behaviour Behaviour) {
 	w.Header().Add("Content-Type", headers.contentType)
 	w.Header().Add("Last-Modified", headers.lastModified)
 	w.Header().Add("Cache-Control", headers.cacheControl)
-	w.Write(body)
+	_, err = w.Write(body)
+	if err != nil {
+		http.Error(w, "Internal server error", 500)
+		return
+	}
 }
 
 // Receive an HTTP request for an image and respond with it
@@ -380,12 +395,16 @@ func FilesInCache(root string) (map[string]string, error) {
 	var files map[string]string
 	var body []byte
 	files = make(map[string]string)
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	werr := filepath.Walk(root, func(path string, info os.FileInfo, err error) (error) {
 		// pedantic: could check that directory is named [0-9a-f][0-9a-f]
-		if !info.IsDir() {
-			body, err = ioutil.ReadFile(path)
+		if err != nil {
+			fmt.Printf("Prevent panic by handling failure accessing a path %q: %v\n", path, err)
+			return err
+		} else if !info.IsDir() {
+			body, err = os.ReadFile(path)
 			if (err != nil) {
 				log.Printf("Error while reading files: %s\n", err);
+				return err
 			} else {
 				h := sha1.New()
 				h.Write(body)
@@ -394,7 +413,7 @@ func FilesInCache(root string) (map[string]string, error) {
 		}
 		return nil
 	})
-	return files, err
+	return files, werr
 }
 
 // Ensure entries from img/latest exist as img/<uri>
@@ -538,9 +557,11 @@ func sanityCheck() (bool) {
 						img_updated_key := "img/updated/" + uri
 						img_err_key := "img/err/" + uri
 						no_checksum := fmt.Sprintf("Image %s: no checksum field", img_key);
-						key := generateKeyForCache(uri)
-						if files[key] != "" {
-							no_checksum += fmt.Sprintf(" (unexpected cache entry exists)");
+						key, err := generateKeyForCache(uri)
+						if err != nil {
+							log.Fatal("generateKeyForCache: ", err)
+						} else if files[key] != "" {
+							no_checksum += " (unexpected cache entry exists)";
 						}
 						exists_updated, err := connection.Exists(img_updated_key).Result()
 						if (err != nil) {
@@ -563,8 +584,10 @@ func sanityCheck() (bool) {
 							log.Printf("Image %s: no type field\n", img_key);
 							sane = false
 						}
-						key := generateKeyForCache(uri)
-						if files[key] == "" {
+						key, err := generateKeyForCache(uri);
+						if err != nil {
+							log.Fatal("generateKeyForCache: ", err);
+						} else if files[key] == "" {
 							log.Printf("Image %s has a checksum but no file in cache\n", img_key);
 							sane = false
 						} else {
@@ -612,8 +635,14 @@ func main() {
 		if err != nil {
 			log.Fatal("OpenFile: ", err)
 		}
-		syscall.Dup2(int(f.Fd()), int(os.Stdout.Fd()))
-		syscall.Dup2(int(f.Fd()), int(os.Stderr.Fd()))
+		err = syscall.Dup2(int(f.Fd()), int(os.Stdout.Fd()))
+		if err != nil {
+			log.Fatal("Dup2 (stdout): ", err)
+		}
+		err = syscall.Dup2(int(f.Fd()), int(os.Stderr.Fd()))
+		if err != nil {
+			log.Fatal("Dup2 (stderr): ", err)
+		}
 	}
 
 	// Redis
