@@ -30,7 +30,7 @@ services:
         condition: service_started
 
   redis:
-    image: redis:5
+    image: redis:7.0.15-alpine3.20
     volumes:
       - data-redis:/data
     ports:
