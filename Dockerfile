@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Build
-FROM docker.io/golang:1.23.3-alpine AS build
+FROM docker.io/golang:1.23.4-alpine AS build
 
 WORKDIR /app
 
@@ -17,7 +17,7 @@ RUN go install golang.org/x/vuln/cmd/govulncheck@latest \
   && govulncheck -show verbose ./... \
   && govulncheck -show verbose --mode=binary /img-LinuxFr.org
 
-RUN apk add --no-cache tzdata=2024b-r0
+RUN apk add --no-cache tzdata=2024b-r1
 
 # Deploy
 FROM docker.io/alpine:3.20.3
