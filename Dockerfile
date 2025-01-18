@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Build
-FROM docker.io/golang:1.23.4-alpine AS build
+FROM docker.io/golang:1.23.5-alpine AS build
 
 WORKDIR /app
 
@@ -20,7 +20,7 @@ RUN go install golang.org/x/vuln/cmd/govulncheck@latest \
 RUN apk add --no-cache tzdata=2024b-r1
 
 # Deploy
-FROM docker.io/alpine:3.20.3
+FROM docker.io/alpine:3.20.5
 USER 1000
 
 LABEL "org.opencontainers.image.source"="https://github.com/linuxfrorg/img-LinuxFr.org"
