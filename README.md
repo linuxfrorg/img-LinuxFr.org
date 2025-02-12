@@ -40,8 +40,6 @@ Build and run Docker image:
 
     $ docker build -t linuxfr.org-img .
     $ docker run --publish 8000:8000 linuxfr.org-img
-    or
-    $ docker run --publish 8000:8000 --env REDIS=someredis:6379/1 linuxfr.org-img
 
 How it works?
 -------------

@@ -35,6 +35,5 @@ COPY --from=build /img-LinuxFr.org /img-LinuxFr.org
 
 EXPOSE 8000
 
-# variable not interpreted with JSON format
-# hadolint ignore=DL3025
-CMD /img-LinuxFr.org -r ${REDIS:-redis:6379/0} -d ${CACHE:-cache} -l ${LOGFILE:--} -a ${ADDR:-127.0.0.1:8000} -e ${AVATAR:-//nginx/default-avatar.svg}
+ENTRYPOINT ["/img-LinuxFr.org"]
+CMD ["--help"]

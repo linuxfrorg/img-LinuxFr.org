@@ -6,11 +6,8 @@ services:
   linuxfr.org-img:
     build:
       context: ..
-    environment:
-      REDIS: "redis:6379/0"
-      #works also with REDIS: "[fd42:3200:3200::30]:6379/0"
-      CACHE: "/cache"
-      ADDR: "0.0.0.0:8000"
+    command: -r redis:6379/0 -d /cache -l - -a 0.0.0.0:8000 -e //nginx/default-avatar.svg
+    #works also with -r "[fd42:3200:3200::30]:6379/0"
     depends_on:
       - redis
       - nginx
