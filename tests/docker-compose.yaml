@@ -44,7 +44,7 @@ services:
       - net.ipv6.conf.eth0.proxy_ndp=1
 
   nginx:
-    image: nginx:1.26.2
+    image: nginx:1.26.3
     volumes:
       - ./data-web:/usr/share/nginx/html
       - ./nginx.conf:/etc/nginx/conf.d/default.conf
