@@ -143,7 +143,7 @@ docker run --rm --interactive hadolint/hadolint < Dockerfile
 docker run --rm --volume $(pwd)/Dockerfile:/app/Dockerfile --workdir /app replicated/dockerfilelint Dockerfile
 docker run --rm --interactive hadolint/hadolint < tests/Dockerfile
 docker run --rm --volume $(pwd)/tests/Dockerfile:/app/Dockerfile --workdir /app replicated/dockerfilelint Dockerfile
-docker run --rm --tty --volume $(pwd):/app --workdir /app golangci/golangci-lint:v1.64.3 golangci-lint run -v
+docker run --rm --tty --volume $(pwd):/app --workdir /app golangci/golangci-lint:v2.0.2 golangci-lint run -v
 docker run --rm --volume $(pwd):/app --workdir /app aquasec/trivy repo .
 ```
 

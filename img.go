@@ -111,13 +111,13 @@ func urlStatus(uri string) error {
 		return err
 	}
 	if ok := hexists.Val(); !ok {
-		return errors.New("Invalid URL")
+		return errors.New("invalid URL")
 	}
 
 	hget := connection.HGet("img/" + uri, "status")
 	if err := hget.Err(); err == nil {
 		if status := hget.Val(); status == "Blocked" {
-			return errors.New("Invalid URL")
+			return errors.New("invalid URL")
 		}
 	}
 
@@ -139,7 +139,7 @@ func generateKeyForCache(s string) (string, error) {
 	h := sha1.New()
 	_, err := io.WriteString(h, s)
 	if err != nil {
-		return "", errors.New("Unable to generate key for cache")
+		return "", errors.New("unable to generate key for cache")
 	}
 	key := h.Sum(nil)
 
@@ -287,7 +287,12 @@ func fetchImageFromServer(uri string, behaviour Behaviour) (err error) {
 		log.Printf("Error on httpClient.Get %s: %s\n", uri, err)
 		return
 	}
-	defer res.Body.Close()
+	defer func() {
+		err := res.Body.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
 
 	if res.StatusCode == 304 {
 		resetCacheTimer(uri)
@@ -296,20 +301,20 @@ func fetchImageFromServer(uri string, behaviour Behaviour) (err error) {
 	}
 	if res.StatusCode != 200 {
 		log.Printf("Status code of %s is: %d\n", uri, res.StatusCode)
-		err = errors.New("Unexpected status code")
+		err = errors.New("unexpected status code")
 		saveErrorInCache(uri, err)
 		return
 	}
 	if res.ContentLength > MaxSize {
 		log.Printf("Exceeded max size for %s: %d\n", uri, res.ContentLength)
-		err = errors.New("Exceeded max size")
+		err = errors.New("exceeded max size")
 		saveErrorInCache(uri, err)
 		return
 	}
 	fullContentType := res.Header.Get("Content-Type")
 	if len(fullContentType) < 5 || fullContentType[0:5] != "image" {
 		log.Printf("%s has an invalid content-type: %s\n", uri, fullContentType)
-		err = errors.New("Invalid content-type")
+		err = errors.New("invalid content-type")
 		saveErrorInCache(uri, err)
 		return
 	}
@@ -387,7 +392,10 @@ func Avatar(w http.ResponseWriter, r *http.Request) {
 
 // Returns 200 OK if the server is running (for monitoring)
 func Status(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "OK")
+	_, err := fmt.Fprintf(w, "OK")
+	if err != nil {
+			log.Fatal(err)
+	}
 }
 
 // Return a map filepath / checksum from cache disk
@@ -652,12 +660,17 @@ func main() {
 	if len(parts) >= 2 {
 		db, _ = strconv.Atoi(parts[1])
 	}
-	fmt.Printf("Connection %s  %d\n", host, db)
+	fmt.Printf("Connection %s %d\n", host, db)
 	connection = redis.NewClient(&redis.Options{
 		Addr: host,
 		DB:   int64(db),
 	})
-	defer connection.Close()
+	defer func() {
+		err := connection.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
 
 	// Cache directory
 	stat, err := os.Stat(directory)
