@@ -25,7 +25,7 @@ WEB6_HEX="$(printf "%s" "${WEB6}"|xxd -ps)"
 REDIS_CLI=(docker exec -i "tests_${REDIS}_1" redis-cli)
 # without docker REDIS_CLI=(redis-cli -p 16379)
 HURL=(hurl)
-SANITY=(docker exec -i "tests_${IMG}_1" /img-LinuxFr.org -r "${REDIS}:6379/0" -d cache -l - -c)
+SANITY=(docker exec -i "tests_${IMG}_1" /app/img-LinuxFr.org -r "${REDIS}:6379/0" -d cache -l - -c)
 
 IMAGES_WITH_ONLY_IMG_ENTRY_NO_CACHE="http://bad${WEB}.example.net/nowhere
 http://bad${WEB}/nowhere
