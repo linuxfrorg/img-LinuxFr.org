@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM ghcr.io/orange-opensource/hurl:6.1.1
+FROM ghcr.io/orange-opensource/hurl:7.0.0
 
 LABEL "org.opencontainers.image.source"="https://github.com/linuxfrorg/img-LinuxFr.org"
 LABEL "org.opencontainers.image.description"="Tests suite for reverse-proxy cache for external domains on LinuxFr.org"
@@ -17,11 +17,11 @@ COPY img-tests.sh ./
 
 RUN apk add --no-cache \
       bash=5.2.37-r0 \
-      coreutils=9.5-r2 \
-      docker=27.3.1-r3 \
-      xxd=9.1.1105-r0 \
-      shellcheck=0.10.0-r1 \
-      bind-tools=9.18.35-r0 \
+      coreutils=9.7-r1 \
+      docker=28.3.3-r1 \
+      xxd=9.1.1566-r0 \
+      shellcheck=0.10.0-r2 \
+      bind-tools=9.20.11-r0 \
     && shellcheck /app/img-tests.sh \
     && mkdir -p cache-img
 

@@ -76,7 +76,7 @@ GET http://{{TARGET}}:8000/avatars/687474703A2F2F{{WEB_HEX}}2F7265645F3130307831
 HTTP 200
 [Asserts]
 bytes count == 692
-sha256 == hex,449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7;
+sha256 toHex == "449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7"
 header "Content-Type" == "image/png"
 
 # http://{{WEB}}/red_100x100.png
@@ -86,7 +86,7 @@ http2: true
 HTTP/1.1 200
 [Asserts]
 bytes count == 692
-sha256 == hex,449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7;
+sha256 toHex == "449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7"
 header "Content-Type" == "image/png"
 
 # http://{{WEB}}/red_100x100.png
@@ -118,7 +118,7 @@ GET http://{{TARGET}}:8000/avatars/687474703A2F2F{{WEB_HEX}}2F7265645F3130307831
 HTTP 200
 [Asserts]
 bytes count == 692
-sha256 == hex,449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7;
+sha256 toHex == "449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7"
 header "Content-Type" == "image/png"
 
 # filename with http://{{WEB}}/red_100x100.png
@@ -128,7 +128,7 @@ http2: true
 HTTP/1.1 200
 [Asserts]
 bytes count == 692
-sha256 == hex,449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7;
+sha256 toHex == "449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7"
 header "Content-Type" == "image/png"
 
 # no OPTIONS even on valid http://{{WEB}}/red_100x100.png
@@ -156,7 +156,7 @@ GET http://{{TARGET}}:8000/avatars/687474703A2F2F{{WEB_HEX}}2F7265645F3130307831
 HTTP 200
 [Asserts]
 bytes count == 6724
-sha256 == hex,0e08bdeffe7a7d6a03d42dd38fd6b7ece7c4a125cd0949822bb60526d04d771c;
+sha256 toHex == "0e08bdeffe7a7d6a03d42dd38fd6b7ece7c4a125cd0949822bb60526d04d771c"
 header "Content-Type" == "image/jpeg"
 
 # http://{{WEB}}/red_100x100.jpg
@@ -166,7 +166,7 @@ http2: true
 HTTP/1.1 200
 [Asserts]
 bytes count == 6724
-sha256 == hex,0e08bdeffe7a7d6a03d42dd38fd6b7ece7c4a125cd0949822bb60526d04d771c;
+sha256 toHex == "0e08bdeffe7a7d6a03d42dd38fd6b7ece7c4a125cd0949822bb60526d04d771c"
 header "Content-Type" == "image/jpeg"
 
 # http://{{WEB}}/red_100x100.jpeg
@@ -174,7 +174,7 @@ GET http://{{TARGET}}:8000/avatars/687474703A2F2F{{WEB_HEX}}2F7265645F3130307831
 HTTP 200
 [Asserts]
 bytes count == 6724
-sha256 == hex,85816ce34ac589eec725929fbbaa862cdd1585058faf206efedc0237cfac8221;
+sha256 toHex == "85816ce34ac589eec725929fbbaa862cdd1585058faf206efedc0237cfac8221"
 header "Content-Type" == "image/jpeg"
 
 # http://{{WEB}}/red_100x100.jpeg
@@ -184,7 +184,7 @@ http2: true
 HTTP/1.1 200
 [Asserts]
 bytes count == 6724
-sha256 == hex,85816ce34ac589eec725929fbbaa862cdd1585058faf206efedc0237cfac8221;
+sha256 toHex == "85816ce34ac589eec725929fbbaa862cdd1585058faf206efedc0237cfac8221"
 header "Content-Type" == "image/jpeg"
 
 # http://{{WEB}}/red_100x100.bmp
@@ -192,7 +192,7 @@ GET http://{{TARGET}}:8000/avatars/687474703A2F2F{{WEB_HEX}}2F7265645F3130307831
 HTTP 200
 [Asserts]
 bytes count == 30138
-sha256 == hex,130f82d2a481fca7b6d99696ad9bb278272de5c0beb00aea373290c88f3f2065;
+sha256 toHex == "130f82d2a481fca7b6d99696ad9bb278272de5c0beb00aea373290c88f3f2065"
 header "Content-Type" == "image/x-ms-bmp"
 
 # http://{{WEB}}/red_100x100.bmp
@@ -202,7 +202,7 @@ http2: true
 HTTP/1.1 200
 [Asserts]
 bytes count == 30138
-sha256 == hex,130f82d2a481fca7b6d99696ad9bb278272de5c0beb00aea373290c88f3f2065;
+sha256 toHex == "130f82d2a481fca7b6d99696ad9bb278272de5c0beb00aea373290c88f3f2065"
 header "Content-Type" == "image/x-ms-bmp"
 
 # http://{{WEB}}/red_100x100.tiff
@@ -210,7 +210,7 @@ GET http://{{TARGET}}:8000/avatars/687474703A2F2F{{WEB_HEX}}2F7265645F3130307831
 HTTP 200
 [Asserts]
 bytes count == 34626
-sha256 == hex,efcbc0a4f24d9830154a2da47fefa5761d8d211b004004742009bab85608b518;
+sha256 toHex == "efcbc0a4f24d9830154a2da47fefa5761d8d211b004004742009bab85608b518"
 header "Content-Type" == "image/tiff"
 
 # http://{{WEB}}/red_100x100.tiff
@@ -220,7 +220,7 @@ http2: true
 HTTP/1.1 200
 [Asserts]
 bytes count == 34626
-sha256 == hex,efcbc0a4f24d9830154a2da47fefa5761d8d211b004004742009bab85608b518;
+sha256 toHex == "efcbc0a4f24d9830154a2da47fefa5761d8d211b004004742009bab85608b518"
 header "Content-Type" == "image/tiff"
 
 # http://{{WEB}}/red_100x100.webp
@@ -228,7 +228,7 @@ GET http://{{TARGET}}:8000/avatars/687474703A2F2F{{WEB_HEX}}2F7265645F3130307831
 HTTP 200
 [Asserts]
 bytes count == 4414
-sha256 == hex,64be2d2a7c8cd935363a7aa2b1abed1e223dbc370136dc1402cf94cbff9cb18b;
+sha256 toHex == "64be2d2a7c8cd935363a7aa2b1abed1e223dbc370136dc1402cf94cbff9cb18b"
 header "Content-Type" == "image/webp"
 
 # http://{{WEB}}/red_100x100.webp
@@ -238,7 +238,7 @@ http2: true
 HTTP/1.1 200
 [Asserts]
 bytes count == 4414
-sha256 == hex,64be2d2a7c8cd935363a7aa2b1abed1e223dbc370136dc1402cf94cbff9cb18b;
+sha256 toHex == "64be2d2a7c8cd935363a7aa2b1abed1e223dbc370136dc1402cf94cbff9cb18b"
 header "Content-Type" == "image/webp"
 
 # http://{{WEB}}/red_100x100.gif
@@ -246,7 +246,7 @@ GET http://{{TARGET}}:8000/avatars/687474703A2F2F{{WEB_HEX}}2F7265645F3130307831
 HTTP 200
 [Asserts]
 bytes count == 169
-sha256 == hex,ecebb0a413120b65c28ddb0d9604659376cb0f45a3dceb597c1336bce61cb20e;
+sha256 toHex == "ecebb0a413120b65c28ddb0d9604659376cb0f45a3dceb597c1336bce61cb20e"
 header "Content-Type" == "image/gif"
 
 # http://{{WEB}}/red_100x100.gif
@@ -256,7 +256,7 @@ http2: true
 HTTP/1.1 200
 [Asserts]
 bytes count == 169
-sha256 == hex,ecebb0a413120b65c28ddb0d9604659376cb0f45a3dceb597c1336bce61cb20e;
+sha256 toHex == "ecebb0a413120b65c28ddb0d9604659376cb0f45a3dceb597c1336bce61cb20e"
 header "Content-Type" == "image/gif"
 
 # http://{{WEB}}/red_100x100.svg
@@ -264,7 +264,7 @@ GET http://{{TARGET}}:8000/avatars/687474703A2F2F{{WEB_HEX}}2F7265645F3130307831
 HTTP 200
 [Asserts]
 bytes count == 1520
-sha256 == hex,b3b2dfc7130defd52a797d6b01547da188cc6aa82c16d5d46a0c90464df6831a;
+sha256 toHex == "b3b2dfc7130defd52a797d6b01547da188cc6aa82c16d5d46a0c90464df6831a"
 header "Content-Type" == "image/svg+xml"
 
 # http://{{WEB}}/red_100x100.svg
@@ -274,7 +274,7 @@ http2: true
 HTTP/1.1 200
 [Asserts]
 bytes count == 1520
-sha256 == hex,b3b2dfc7130defd52a797d6b01547da188cc6aa82c16d5d46a0c90464df6831a;
+sha256 toHex == "b3b2dfc7130defd52a797d6b01547da188cc6aa82c16d5d46a0c90464df6831a"
 header "Content-Type" == "image/svg+xml"
 
 # http://{{WEB}}/red_100x100.avif
@@ -282,7 +282,7 @@ GET http://{{TARGET}}:8000/avatars/687474703A2F2F{{WEB_HEX}}2F7265645F3130307831
 HTTP 200
 [Asserts]
 bytes count == 980
-sha256 == hex,7f40f1a1a8bddef97a8e48b486f99d0a4b518b97e30ed85cbd30a19a41e0fc91;
+sha256 toHex == "7f40f1a1a8bddef97a8e48b486f99d0a4b518b97e30ed85cbd30a19a41e0fc91"
 header "Content-Type" == "image/avif"
 
 # http://{{WEB}}/red_100x100.avif
@@ -292,7 +292,7 @@ http2: true
 HTTP/1.1 200
 [Asserts]
 bytes count == 980
-sha256 == hex,7f40f1a1a8bddef97a8e48b486f99d0a4b518b97e30ed85cbd30a19a41e0fc91;
+sha256 toHex == "7f40f1a1a8bddef97a8e48b486f99d0a4b518b97e30ed85cbd30a19a41e0fc91"
 header "Content-Type" == "image/avif"
 
 # http://{{WEB}}/red_10000x10000.png
@@ -300,7 +300,7 @@ GET http://{{TARGET}}:8000/avatars/687474703A2F2F{{WEB_HEX}}2F7265645F3130303030
 HTTP 200
 [Asserts]
 bytes count == 317124
-sha256 == hex,1629535232f1b74c6e05b9284bf90034ae4e76a5c803437e75ac4c6b9ce4fc26;
+sha256 toHex == "1629535232f1b74c6e05b9284bf90034ae4e76a5c803437e75ac4c6b9ce4fc26"
 header "Content-Type" == "image/png"
 
 # http://{{WEB}}/red_10000x10000.png
@@ -310,7 +310,7 @@ http2: true
 HTTP/1.1 200
 [Asserts]
 bytes count == 317124
-sha256 == hex,1629535232f1b74c6e05b9284bf90034ae4e76a5c803437e75ac4c6b9ce4fc26;
+sha256 toHex == "1629535232f1b74c6e05b9284bf90034ae4e76a5c803437e75ac4c6b9ce4fc26"
 header "Content-Type" == "image/png"
 
 # Exceeded max size for http://{{WEB}}/random_2000x2000.png
@@ -472,7 +472,7 @@ GET http://{{TARGET}}:8000/avatars/687474703a2f2f{{WEB_HEX}}2f737461747573333031
 HTTP 200
 [Asserts]
 bytes count == 692
-sha256 == hex,449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7;
+sha256 toHex == "449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7"
 header "Content-Type" == "image/png"
 
 # 301 at first fetch http://{{WEB}}/status301
@@ -482,7 +482,7 @@ http2: true
 HTTP/1.1 200
 [Asserts]
 bytes count == 692
-sha256 == hex,449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7;
+sha256 toHex == "449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7"
 header "Content-Type" == "image/png"
 
 # 302 at first fetch http://{{WEB}}/status302
@@ -490,7 +490,7 @@ GET http://{{TARGET}}:8000/avatars/687474703a2f2f{{WEB_HEX}}2f737461747573333032
 HTTP 200
 [Asserts]
 bytes count == 692
-sha256 == hex,449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7;
+sha256 toHex == "449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7"
 header "Content-Type" == "image/png"
 
 # 302 at first fetch http://{{WEB}}/status302
@@ -500,7 +500,7 @@ http2: true
 HTTP/1.1 200
 [Asserts]
 bytes count == 692
-sha256 == hex,449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7;
+sha256 toHex == "449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7"
 header "Content-Type" == "image/png"
 
 # 308 at first fetch http://{{WEB}}/status308
@@ -508,7 +508,7 @@ GET http://{{TARGET}}:8000/avatars/687474703a2f2f{{WEB_HEX}}2f737461747573333038
 HTTP 200
 [Asserts]
 bytes count == 692
-sha256 == hex,449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7;
+sha256 toHex == "449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7"
 header "Content-Type" == "image/png"
 
 # 308 at first fetch http://{{WEB}}/status308
@@ -518,7 +518,7 @@ http2: true
 HTTP/1.1 200
 [Asserts]
 bytes count == 692
-sha256 == hex,449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7;
+sha256 toHex == "449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7"
 header "Content-Type" == "image/png"
 
 # 400 at first fetch http://{{WEB}}/status400

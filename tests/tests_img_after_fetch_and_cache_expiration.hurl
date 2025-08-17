@@ -5,7 +5,7 @@ http2: {{HTTP2}}
 HTTP/1.1 200
 [Asserts]
 bytes count == 317124
-sha256 == hex,1629535232f1b74c6e05b9284bf90034ae4e76a5c803437e75ac4c6b9ce4fc26;
+sha256 toHex == "1629535232f1b74c6e05b9284bf90034ae4e76a5c803437e75ac4c6b9ce4fc26"
 header "Content-Type" == "image/png"
 
 # http://{{WEB}}/red_100x100_removed_after_fetch.png
@@ -15,7 +15,7 @@ http2: {{HTTP2}}
 HTTP/1.1 200
 [Asserts]
 bytes count == 692
-sha256 == hex,449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7;
+sha256 toHex == "449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7"
 header "Content-Type" == "image/png" # from disk cache despite error from remote server
 
 # http://{{WEB}}/red_100x100_converted_after_fetch.png
@@ -25,7 +25,7 @@ http2: {{HTTP2}}
 HTTP/1.1 200
 [Asserts]
 bytes count == 169
-sha256 == hex,ecebb0a413120b65c28ddb0d9604659376cb0f45a3dceb597c1336bce61cb20e;
+sha256 toHex == "ecebb0a413120b65c28ddb0d9604659376cb0f45a3dceb597c1336bce61cb20e"
 header "Content-Type" == "image/png" # not really
 
 # http://{{WEB}}/red_100x100_blocked_after_fetch.png

@@ -5,7 +5,7 @@ http2: {{HTTP2}}
 HTTP/1.1 200
 [Asserts]
 bytes count == 692
-sha256 == hex,449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7;
+sha256 toHex == "449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7"
 header "Content-Type" == "image/png"
 
 # http://{{WEB}}/red_100x100_removed_after_fetch.png (until next fetch)
@@ -15,7 +15,7 @@ http2: {{HTTP2}}
 HTTP/1.1 200
 [Asserts]
 bytes count == 692
-sha256 == hex,449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7;
+sha256 toHex == "449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7"
 header "Content-Type" == "image/png"
 
 # http://{{WEB}}/red_100x100_converted_after_fetch.png (will be converted at next fetch)
@@ -25,7 +25,7 @@ http2: {{HTTP2}}
 HTTP/1.1 200
 [Asserts]
 bytes count == 692
-sha256 == hex,449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7;
+sha256 toHex == "449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7"
 header "Content-Type" == "image/png"
 
 # http://{{WEB}}/red_100x100_blocked_after_fetch.png (immediate effect)
