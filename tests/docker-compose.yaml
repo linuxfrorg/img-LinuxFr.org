@@ -23,7 +23,7 @@ services:
       - net.ipv6.conf.eth0.proxy_ndp=1
 
   redis:
-    image: redis:8.0.4-alpine3.21
+    image: redis:8.0.5-alpine3.21
     volumes:
       - data-redis:/data
     ports:
