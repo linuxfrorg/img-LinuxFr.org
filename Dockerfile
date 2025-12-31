@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Build
-FROM docker.io/golang:1.25.5-alpine3.22 AS build
+FROM docker.io/golang:1.25.5-alpine3.23 AS build
 
 WORKDIR /app
 
@@ -18,10 +18,10 @@ RUN go install golang.org/x/vuln/cmd/govulncheck@latest \
   && govulncheck -show verbose ./... \
   && govulncheck -show verbose --mode=binary img-LinuxFr.org
 
-RUN apk add --no-cache tzdata=2025b-r0
+RUN apk add --no-cache tzdata=2025c-r0
 
 # Deploy
-FROM docker.io/alpine:3.22.2
+FROM docker.io/alpine:3.23.2
 ARG UID=1000
 ARG GID=1000
 RUN addgroup -g "${GID}" app \
