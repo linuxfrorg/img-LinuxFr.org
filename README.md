@@ -110,7 +110,7 @@ graph TD
 
 Redis schema
 ------------
-(extracted from [full LinuxFr.org Redis schema](https://github.com/linuxfrorg/linuxfr.org/blob/master/db/redis.txt))
+(extracted from [full LinuxFr.org Redis schema](https://github.com/linuxfrorg/linuxfr.org/blob/main/db/redis.txt))
 
 Key                                            | Type   | Value                 | Expiration | Description
 ---------------------------------------------- | ------ | --------------------- | ---------- | -------------------
