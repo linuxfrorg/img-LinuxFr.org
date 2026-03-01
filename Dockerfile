@@ -9,9 +9,11 @@ COPY go.mod ./
 COPY go.sum ./
 RUN go mod download
 
+COPY img.go ./img.go.bak
 COPY img.go ./img.go
 
-RUN go vet \
+RUN go fmt && go vet && go fix \
+  && diff ./img.go.bak ./img.go \
   && go build -trimpath -o img-LinuxFr.org
 
 RUN go install golang.org/x/vuln/cmd/govulncheck@latest \

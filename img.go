@@ -17,6 +17,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -106,7 +107,7 @@ var defaultAvatarUrl string
 
 // Check if an URL is valid and not temporarily in error
 func urlStatus(uri string) error {
-	hexists := connection.HExists("img/" + uri, "created_at")
+	hexists := connection.HExists("img/"+uri, "created_at")
 	if err := hexists.Err(); err != nil {
 		return err
 	}
@@ -114,7 +115,7 @@ func urlStatus(uri string) error {
 		return errors.New("invalid URL")
 	}
 
-	hget := connection.HGet("img/" + uri, "status")
+	hget := connection.HGet("img/"+uri, "status")
 	if err := hget.Err(); err == nil {
 		if status := hget.Val(); status == "Blocked" {
 			return errors.New("invalid URL")
@@ -124,7 +125,7 @@ func urlStatus(uri string) error {
 	get := connection.Get("img/err/" + uri)
 	if err := get.Err(); err == nil {
 		str := get.Val()
-		try := connection.HGet("img/" + uri, "checksum")
+		try := connection.HGet("img/"+uri, "checksum")
 		if try.Err() == nil && try.Val() != "" {
 			return nil // fallback on cache disk despite error
 		}
@@ -179,7 +180,7 @@ func resetCacheTimer(uri string) {
 		log.Printf("Couldn't Get mtime while resetting cache timer for %s: %s\n", uri, err)
 		return
 	}
-	connection.Set("img/updated/" + uri, mtime, CacheRefreshInterval)
+	connection.Set("img/updated/"+uri, mtime, CacheRefreshInterval)
 }
 
 // Fetch image from cache
@@ -188,7 +189,7 @@ func fetchImageFromCache(uri string, behaviour Behaviour) (headers Headers, body
 	if exists.Err() != nil || !exists.Val() {
 		err = fetchImageFromServer(uri, behaviour)
 		if err != nil {
-			hget := connection.HGet("img/" + uri, "checksum")
+			hget := connection.HGet("img/"+uri, "checksum")
 			if hget.Err() != nil || hget.Val() == "" {
 				return
 			} else {
@@ -197,7 +198,7 @@ func fetchImageFromCache(uri string, behaviour Behaviour) (headers Headers, body
 		}
 	}
 
-	hget := connection.HGet("img/" + uri, "type")
+	hget := connection.HGet("img/"+uri, "type")
 	if err = hget.Err(); err != nil {
 		return
 	}
@@ -223,7 +224,7 @@ func fetchImageFromCache(uri string, behaviour Behaviour) (headers Headers, body
 // Save the body and the content-type header in cache
 func saveImageInCache(uri string, contentType string, etag string, body []byte) (err error) {
 	checksum := generateChecksumForCache(body)
-	hget := connection.HGet("img/" + uri, "checksum")
+	hget := connection.HGet("img/"+uri, "checksum")
 	if err = hget.Err(); err == nil {
 		if was := hget.Val(); checksum == was {
 			resetCacheTimer(uri)
@@ -249,12 +250,12 @@ func saveImageInCache(uri string, contentType string, etag string, body []byte) 
 	}
 
 	// And other infos in redis
-	connection.HSet("img/" + uri, "type", contentType)
-	connection.HSet("img/" + uri, "checksum", checksum)
+	connection.HSet("img/"+uri, "type", contentType)
+	connection.HSet("img/"+uri, "checksum", checksum)
 	if etag == "" {
-		connection.HDel("img/" + uri, "etag")
+		connection.HDel("img/"+uri, "etag")
 	} else {
-		connection.HSet("img/" + uri, "etag", etag)
+		connection.HSet("img/"+uri, "etag", etag)
 	}
 	resetCacheTimer(uri)
 
@@ -264,7 +265,7 @@ func saveImageInCache(uri string, contentType string, etag string, body []byte) 
 // Save the error in redis for the cache refresh interval duration
 func saveErrorInCache(uri string, err error) {
 	go func() {
-		connection.Set("img/err/" + uri, err.Error(), CacheRefreshInterval)
+		connection.Set("img/err/"+uri, err.Error(), CacheRefreshInterval)
 	}()
 }
 
@@ -275,7 +276,7 @@ func fetchImageFromServer(uri string, behaviour Behaviour) (err error) {
 		log.Printf("Error on http.NewRequest GET %s: %s\n", uri, err)
 		return
 	}
-	hget := connection.HGet("img/" + uri, "etag")
+	hget := connection.HGet("img/"+uri, "etag")
 	if err = hget.Err(); err == nil {
 		etag := hget.Val()
 		req.Header.Set("If-None-Match", etag)
@@ -318,7 +319,7 @@ func fetchImageFromServer(uri string, behaviour Behaviour) (err error) {
 		saveErrorInCache(uri, err)
 		return
 	}
-	contentType,_,_ := strings.Cut(fullContentType, ";")
+	contentType, _, _ := strings.Cut(fullContentType, ";")
 
 	etag := res.Header.Get("ETag")
 	log.Printf("Fetch %s (%s) (ETag: %s)\n", uri, contentType, etag)
@@ -394,7 +395,7 @@ func Avatar(w http.ResponseWriter, r *http.Request) {
 func Status(w http.ResponseWriter, r *http.Request) {
 	_, err := fmt.Fprintf(w, "OK")
 	if err != nil {
-			log.Fatal(err)
+		log.Fatal(err)
 	}
 }
 
@@ -403,15 +404,15 @@ func FilesInCache(root string) (map[string]string, error) {
 	var files map[string]string
 	var body []byte
 	files = make(map[string]string)
-	werr := filepath.Walk(root, func(path string, info os.FileInfo, err error) (error) {
+	werr := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		// pedantic: could check that directory is named [0-9a-f][0-9a-f]
 		if err != nil {
 			fmt.Printf("Prevent panic by handling failure accessing a path %q: %v\n", path, err)
 			return err
 		} else if !info.IsDir() {
 			body, err = os.ReadFile(path)
-			if (err != nil) {
-				log.Printf("Error while reading files: %s\n", err);
+			if err != nil {
+				log.Printf("Error while reading files: %s\n", err)
 				return err
 			} else {
 				h := sha1.New()
@@ -426,16 +427,16 @@ func FilesInCache(root string) (map[string]string, error) {
 
 // Ensure entries from img/latest exist as img/<uri>
 func sanityCheckImgLatest() (latest_img []string) {
-	latest_img, err := connection.LRange("img/latest", 0, -1).Result();
+	latest_img, err := connection.LRange("img/latest", 0, -1).Result()
 	if err != nil {
-		log.Printf("Error getting img/latest entry: %s\n", err);
+		log.Printf("Error getting img/latest entry: %s\n", err)
 	} else {
 		for _, v := range latest_img {
 			img, err := connection.Exists("img/" + v).Result()
-			if (err != nil) {
-				log.Printf("Error getting %s listed in img/latest: %s\n", v, err);
+			if err != nil {
+				log.Printf("Error getting %s listed in img/latest: %s\n", v, err)
 			} else if !img {
-				log.Printf("Image %s listed in img/latest but unknown\n", v);
+				log.Printf("Image %s listed in img/latest but unknown\n", v)
 			}
 		}
 	}
@@ -444,17 +445,17 @@ func sanityCheckImgLatest() (latest_img []string) {
 
 // Ensure entries from img/blocked exist as img/<uri>
 func sanityCheckImgBlocked() (blocked_img []string) {
-	blocked_img, err := connection.LRange("img/blocked", 0, -1).Result();
+	blocked_img, err := connection.LRange("img/blocked", 0, -1).Result()
 	if err != nil {
-		log.Printf("Error getting img/blocked entry: %s\n", err);
+		log.Printf("Error getting img/blocked entry: %s\n", err)
 	} else if len(blocked_img) > 0 {
-		log.Printf("Entries still in getting img/blocked list: %d\n", len(blocked_img));
+		log.Printf("Entries still in getting img/blocked list: %d\n", len(blocked_img))
 		for _, v := range blocked_img {
 			img, err := connection.Exists("img/" + v).Result()
-			if (err != nil) {
-				log.Printf("Error getting %s listed in img/blocked: %s\n", v, err);
+			if err != nil {
+				log.Printf("Error getting %s listed in img/blocked: %s\n", v, err)
 			} else if !img {
-				log.Printf("Image %s listed in img/blocked but unknown\n", v);
+				log.Printf("Image %s listed in img/blocked but unknown\n", v)
 			}
 		}
 	}
@@ -462,14 +463,14 @@ func sanityCheckImgBlocked() (blocked_img []string) {
 }
 
 // Scan img related keys in redis and files in cache disk for sanity check
-func sanityCheck() (bool) {
+func sanityCheck() bool {
 	sane := true
-	files, err := FilesInCache(directory);
+	files, err := FilesInCache(directory)
 	if err != nil {
-		log.Printf("Unable to walk through cache disk: %s\n", err);
+		log.Printf("Unable to walk through cache disk: %s\n", err)
 		return false
 	}
-	log.Printf("Files in cache: %d\n", len(files));
+	log.Printf("Files in cache: %d\n", len(files))
 
 	sanityCheckImgLatest()
 	blocked_img := sanityCheckImgBlocked()
@@ -490,113 +491,107 @@ func sanityCheck() (bool) {
 				// handled above
 			} else if strings.HasPrefix(img_key, "img/updated/") || strings.HasPrefix(img_key, "img/err/") {
 				ttl, err := connection.TTL(img_key).Result()
-				if (err != nil) {
-					log.Printf("Error getting TTL on %s", img_key);
+				if err != nil {
+					log.Printf("Error getting TTL on %s", img_key)
 					sane = false
-				} else if ttl == -1 * time.Second {
-					log.Printf("Missing TTL %s", img_key);
+				} else if ttl == -1*time.Second {
+					log.Printf("Missing TTL %s", img_key)
 					sane = false
 				}
 			} else { // img/<uri>
 				hgetall, err := connection.HGetAll(img_key).Result()
 				if err != nil {
-					log.Printf("Image %s: unable to get all fields/values %s\n", img_key, err);
+					log.Printf("Image %s: unable to get all fields/values %s\n", img_key, err)
 					sane = false
 				} else {
 					uri := img_key[4:]
 					has_created_at := false
 					has_type := false
 					has_checksum := false
-					allowed_types := [...]string{"image/jpeg", "image/png", "image/gif", "image/svg+xml", "image/webp", "image/tiff", "image/avif", "image/x-ms-bmp", "image/bmp", "image/x-icon", "image/vnd.microsoft.icon"};
-					for i := 0; i < len(hgetall) ; i += 1 {
+					allowed_types := [...]string{"image/jpeg", "image/png", "image/gif", "image/svg+xml", "image/webp", "image/tiff", "image/avif", "image/x-ms-bmp", "image/bmp", "image/x-icon", "image/vnd.microsoft.icon"}
+					for i := 0; i < len(hgetall); i += 1 {
 						field := hgetall[i]
 						i += 1
 						value := hgetall[i]
 						switch field {
-							case "created_at":
-								has_created_at = true
-								// pedantic: could check it's an int, lesser or equals to img/latest value
-							case "type":
-								has_type = true
-								allowed_type := false
-								for _, v := range allowed_types {
-									if v == value {
-										allowed_type = true
-										break
-									}
+						case "created_at":
+							has_created_at = true
+							// pedantic: could check it's an int, lesser or equals to img/latest value
+						case "type":
+							has_type = true
+							allowed_type := false
+							for _, v := range allowed_types {
+								if v == value {
+									allowed_type = true
+									break
 								}
-								if !allowed_type {
-									log.Printf("Image %s: unknown value %s for field %s\n", img_key, value, field);
-									sane = false
-								}
-								// pedantic: could check type vs file
-							case "checksum":
-								has_checksum = true
-							case "etag":
-								// nothing
-							case "status":
-								if value != "Blocked" {
-									log.Printf("Image %s: unknown value %s for field %s\n", img_key, value, field);
-									sane = false
-								} else {
-									found_in_blocked := false
-									for _, v := range blocked_img {
-										if v == uri {
-											found_in_blocked = true
-											break
-										}
-									}
-									if !found_in_blocked {
-										log.Printf("Image %s with status Blocked not declared in img/blocked list\n", img_key);
-										sane = false
-									}
-								}
-							default:
-								log.Printf("Image %s: unknown field %s %s\n", img_key, field, value);
+							}
+							if !allowed_type {
+								log.Printf("Image %s: unknown value %s for field %s\n", img_key, value, field)
 								sane = false
+							}
+							// pedantic: could check type vs file
+						case "checksum":
+							has_checksum = true
+						case "etag":
+							// nothing
+						case "status":
+							if value != "Blocked" {
+								log.Printf("Image %s: unknown value %s for field %s\n", img_key, value, field)
+								sane = false
+							} else {
+								found_in_blocked := slices.Contains(blocked_img, uri)
+								if !found_in_blocked {
+									log.Printf("Image %s with status Blocked not declared in img/blocked list\n", img_key)
+									sane = false
+								}
+							}
+						default:
+							log.Printf("Image %s: unknown field %s %s\n", img_key, field, value)
+							sane = false
 						}
 					}
 					if !has_created_at {
-						log.Printf("Image %s: no created_at field\n", img_key);
+						log.Printf("Image %s: no created_at field\n", img_key)
 						sane = false
 					}
 					if !has_checksum {
 						sane = false
 						img_updated_key := "img/updated/" + uri
 						img_err_key := "img/err/" + uri
-						no_checksum := fmt.Sprintf("Image %s: no checksum field", img_key);
+						no_checksum := fmt.Sprintf("Image %s: no checksum field", img_key)
 						key, err := generateKeyForCache(uri)
 						if err != nil {
 							log.Fatal("generateKeyForCache: ", err)
 						} else if files[key] != "" {
-							no_checksum += " (unexpected cache entry exists)";
+							no_checksum += " (unexpected cache entry exists)"
 						}
 						exists_updated, err := connection.Exists(img_updated_key).Result()
-						if (err != nil) {
-							no_checksum += fmt.Sprintf(" (error on /updated/ %s)", err);
+						if err != nil {
+							no_checksum += fmt.Sprintf(" (error on /updated/ %s)", err)
 						} else {
-							no_checksum += fmt.Sprintf(" (/updated/? %t)", exists_updated);
+							no_checksum += fmt.Sprintf(" (/updated/? %t)", exists_updated)
 						}
 						exists_err, err := connection.Exists(img_err_key).Result()
-						if (err != nil) {
-							no_checksum += fmt.Sprintf(" (error on /err/ %s)", err);
+						if err != nil {
+							no_checksum += fmt.Sprintf(" (error on /err/ %s)", err)
 						} else {
-							no_checksum += fmt.Sprintf(" (/err/? %t)", exists_err);
+							no_checksum += fmt.Sprintf(" (/err/? %t)", exists_err)
 						}
 						if !has_type {
-							no_checksum += " (no type field)";
+							no_checksum += " (no type field)"
 						}
-						log.Printf("%s\n", no_checksum);
+						log.Printf("%s\n", no_checksum)
 					} else { // has_checksum
 						if !has_type {
-							log.Printf("Image %s: no type field\n", img_key);
+							log.Printf("Image %s: no type field\n", img_key)
 							sane = false
 						}
-						key, err := generateKeyForCache(uri);
+						key, err := generateKeyForCache(uri)
 						if err != nil {
-							log.Fatal("generateKeyForCache: ", err);
+							log.Fatal("generateKeyForCache: ", err)
 						} else if files[key] == "" {
-							log.Printf("Image %s has a checksum but no file in cache\n", img_key);
+							log.Printf("Image %s has a checksum but no file in cache\n", img_key)
 							sane = false
 						} else {
 							// remove found filename/checksum to detect unknown files in cache (or collision)
@@ -683,7 +678,7 @@ func main() {
 	} else if directory[len(directory)-1:] == "/" {
 		log.Printf("Invalid cache directory %s: do not put a final /\n", directory)
 		os.Exit(1)
-	} else if stat.Mode().Perm() & (1 << (uint(7))) == 0 {
+	} else if stat.Mode().Perm()&(1<<(uint(7))) == 0 {
 		log.Printf("Invalid cache directory %s: unable to write in it as a user\n", directory)
 		os.Exit(1)
 	}
