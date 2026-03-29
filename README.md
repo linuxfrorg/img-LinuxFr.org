@@ -38,7 +38,7 @@ How to use it? (with Docker)
 
 Build and run Docker image:
 
-    $ docker build -t linuxfr.org-img .
+    $ docker build --tag linuxfr.org-img .
     $ docker run --publish 8000:8000 linuxfr.org-img
 
 How it works?
@@ -136,15 +136,33 @@ linuxfr.org-img-test_1  | All tests looks good!
 tests_linuxfr.org-img-test_1 exited with code 0
 ```
 
-Extra checks (linter for Dockefile, Go, and vulnerability/secret scan):
+Extra checks
+------------
+
+Linter for Dockerfile:
 
 ```bash
-docker run --rm --interactive hadolint/hadolint < Dockerfile
-docker run --rm --volume $(pwd)/Dockerfile:/app/Dockerfile --workdir /app replicated/dockerfilelint Dockerfile
-docker run --rm --interactive hadolint/hadolint < tests/Dockerfile
-docker run --rm --volume $(pwd)/tests/Dockerfile:/app/Dockerfile --workdir /app replicated/dockerfilelint Dockerfile
-docker run --rm --tty --volume $(pwd):/app --workdir /app golangci/golangci-lint:v2.10.1 golangci-lint run -v
-docker run --rm --volume $(pwd):/app --workdir /app aquasec/trivy repo .
+for image in Dockerfile tests/Dockerfile
+do
+  # Test with pinned hadolint/hadolint:v2.14.0-debian
+  docker run --rm --interactive hadolint/hadolint@sha256:158cd0184dcaa18bd8ec20b61f4c1cabdf8b32a592d062f57bdcb8e4c1d312e2 < "$image"
+  # Test with replicated/dockerfilelint but last push more than 5 years ago...
+  # docker run --rm --volume $(pwd)/$image:/app/Dockerfile --workdir /app replicated/dockerfilelint@sha256:15ce784e5847966b6d9a88cba348a9429f8b5212f6017180f10ce36b472dfe52 Dockerfile
+done
+```
+
+Linter for Go:
+
+```bash
+docker run --rm --tty --volume $(pwd):/app --workdir /app golangci/golangci-lint:v2.11.4 golangci-lint run --verbose
+```
+
+Vulnerability/secret scanners:
+
+```bash
+# due to [Trivy security incident 2026-03-19](https://github.com/aquasecurity/trivy/discussions/10425) and [GHSA-xcq4-m2r3-cmrj](https://github.com/aquasecurity/trivy/security/advisories/GHSA-xcq4-m2r3-cmrj), stay with pinned v0.69.3 version
+docker run --rm --volume $(pwd):/app --workdir /app aquasec/trivy@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c repo .
+docker run --rm --volume $(pwd):/app --workdir /app chainguard/grype:latest --name linuxfr.org-img --verbose dir:/app
 ```
 
 See also
@@ -159,4 +177,4 @@ The code is licensed as GNU AGPLv3. See the LICENSE file for the full license.
 
 ♡2012-2018 by Bruno Michel. Copying is an act of love. Please copy and share.
 
-2022-2025 by Benoît Sibaud and Adrien Dorsaz.
+2022-2026 by Benoît Sibaud and Adrien Dorsaz.
