@@ -16,14 +16,14 @@ RUN go fmt && go vet && go fix \
   && diff ./img.go.bak ./img.go \
   && go build -trimpath -o img-LinuxFr.org
 
-RUN go install golang.org/x/vuln/cmd/govulncheck@v1.1.4 \
+RUN go install golang.org/x/vuln/cmd/govulncheck@v1.3.0 \
   && govulncheck -show verbose ./... \
   && govulncheck -show verbose --mode=binary img-LinuxFr.org
 
-RUN apk add --no-cache tzdata=2026a-r0
+RUN apk add --no-cache tzdata=2026b-r0
 
 # Deploy
-FROM docker.io/alpine:3.23.3
+FROM docker.io/alpine:3.23.4
 ARG UID=1000
 ARG GID=1000
 RUN addgroup -g "${GID}" app \
