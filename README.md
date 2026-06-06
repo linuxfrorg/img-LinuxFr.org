@@ -160,8 +160,7 @@ docker run --rm --tty --volume $(pwd):/app --workdir /app golangci/golangci-lint
 Vulnerability/secret scanners:
 
 ```bash
-# due to [Trivy security incident 2026-03-19](https://github.com/aquasecurity/trivy/discussions/10425) and [GHSA-xcq4-m2r3-cmrj](https://github.com/aquasecurity/trivy/security/advisories/GHSA-xcq4-m2r3-cmrj), stay with pinned v0.69.3 version
-docker run --rm --volume $(pwd):/app --workdir /app aquasec/trivy@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c repo .
+docker run --rm --volume $(pwd):/app --workdir /app aquasec/trivy:0.71.0 repo .
 docker run --rm --volume $(pwd):/app --workdir /app chainguard/grype:latest --name linuxfr.org-img --verbose dir:/app
 ```
 
