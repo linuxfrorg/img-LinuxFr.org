@@ -18,10 +18,10 @@ COPY img-tests.sh ./
 RUN apk add --no-cache \
       bash=5.3.3-r1 \
       coreutils=9.8-r1 \
-      docker=29.1.3-r4 \
-      xxd=9.2.0389-r0 \
+      docker=29.5.2-r0 \
+      xxd=9.2.0602-r0 \
       shellcheck=0.11.0-r0 \
-      bind-tools=9.20.22-r0 \
+      bind-tools=9.20.23-r0 \
     && shellcheck /app/img-tests.sh \
     && mkdir -p cache-img
 

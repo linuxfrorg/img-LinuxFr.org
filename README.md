@@ -160,7 +160,7 @@ docker run --rm --tty --volume $(pwd):/app --workdir /app golangci/golangci-lint
 Vulnerability/secret scanners:
 
 ```bash
-docker run --rm --volume $(pwd):/app --workdir /app aquasec/trivy:0.71.0 repo .
+docker run --rm --volume $(pwd):/app --workdir /app aquasec/trivy:0.71.2 repo .
 docker run --rm --volume $(pwd):/app --workdir /app chainguard/grype:latest --name linuxfr.org-img --verbose dir:/app
 ```
 
