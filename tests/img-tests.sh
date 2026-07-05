@@ -30,8 +30,11 @@ SANITY=(docker exec -i "tests-${IMG}-1" /app/img-LinuxFr.org -r "${REDIS}:6379/0
 IMAGES_WITH_ONLY_IMG_ENTRY_NO_CACHE="http://bad${WEB}.example.net/nowhere
 http://bad${WEB}/nowhere
 http://${WEB}:81/closed_port
-http://${WEB}/redirectloop"
+http://${WEB}/redirectloop
+http://${WEB}/orange_100x100_old.png"
 IMAGES_WITH_ONLY_IMG_ENTRY_NO_CACHE_AND_BLOCKED="http://${WEB}/blocked.png"
+IMAGES_OLDER_THAN_REFRESH_PERIOD="http://${WEB}/orange_100x100_old.png"
+IMAGES_WILL_BE_OLDER_THAN_REFRESH_PERIOD="http://${WEB}/orange_100x100_will_be_old.png"
 IMAGES_WITH_ONLY_IMG_ENTRY_STILL_IN_CACHE="http://${WEB}/red_100x100_blocked_after_fetch.png"
 
 IMAGES_WITH_IMG_AND_ERR_ENTRIES_NO_CACHE="http://${WEB}/bad_content.html
@@ -62,7 +65,8 @@ http://${WEB}/status530
 http://${WEB}/status666"
 IMAGES_WITH_IMG_AND_ERR_ENTRIES_STILL_IN_CACHE="http://${WEB}/red_100x100_removed_after_fetch.png"
 
-IMAGES_WITH_IMG_AND_UPDATED_ENTRIES="http://${WEB}/red_10000x10000.png
+IMAGES_WITH_IMG_AND_UPDATED_ENTRIES="$IMAGES_WILL_BE_OLDER_THAN_REFRESH_PERIOD
+http://${WEB}/red_10000x10000.png
 http://${WEB}/red_100x100.avif
 http://${WEB}/red_100x100.bmp
 http://${WEB}/red_100x100.gif
@@ -93,7 +97,8 @@ $IMAGES_WITH_ONLY_IMG_ENTRY_NO_CACHE
 $IMAGES_WITH_ONLY_IMG_ENTRY_NO_CACHE_AND_BLOCKED
 $IMAGES_WITH_ONLY_IMG_ENTRY_STILL_IN_CACHE
 $IMAGES_WITH_IMG_AND_ERR_ENTRIES_NO_CACHE
-$IMAGES_WITH_IMG_AND_ERR_ENTRIES_STILL_IN_CACHE"
+$IMAGES_WITH_IMG_AND_ERR_ENTRIES_STILL_IN_CACHE
+$IMAGES_OLDER_THAN_REFRESH_PERIOD"
 
 printf "Cleaning img cache directory: %s\n" "$CACHE_IMG"
 rm -rf -- "$CACHE_IMG"/[0-9a-f][0-9a-f]
@@ -112,6 +117,12 @@ do
 "${REDIS_CLI[@]}" > /dev/null <<EOF
 HSET img/$img status Blocked
 LPUSH img/blocked $img
+EOF
+done
+for img in $IMAGES_OLDER_THAN_REFRESH_PERIOD
+do
+"${REDIS_CLI[@]}" > /dev/null <<EOF
+HSET img/$img created_at 1400000000
 EOF
 done
 
@@ -160,6 +171,14 @@ for img in \
 do
 "${REDIS_CLI[@]}" > /dev/null <<EOF
 DEL img/updated/$img
+EOF
+done
+
+# alter images to make them old
+for img in $IMAGES_WILL_BE_OLDER_THAN_REFRESH_PERIOD
+do
+"${REDIS_CLI[@]}" > /dev/null <<EOF
+HSET img/$img created_at 1400000000
 EOF
 done
 
