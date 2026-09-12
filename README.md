@@ -144,8 +144,8 @@ Linter for Dockerfile:
 ```bash
 for image in Dockerfile tests/Dockerfile
 do
-  # Test with pinned hadolint/hadolint:v2.14.0-debian
-  docker run --rm --interactive hadolint/hadolint@sha256:158cd0184dcaa18bd8ec20b61f4c1cabdf8b32a592d062f57bdcb8e4c1d312e2 < "$image"
+  # Test with pinned hadolint/hadolint:v2.15.1-debian
+  docker run --rm --interactive hadolint/hadolint@sha256:9a3944b7fddcb947d1ffd90829ac1a6e5c30479223358f249d8b96c7d0019e27 < "$image"
   # Test with replicated/dockerfilelint but last push more than 5 years ago...
   # docker run --rm --volume $(pwd)/$image:/app/Dockerfile --workdir /app replicated/dockerfilelint@sha256:15ce784e5847966b6d9a88cba348a9429f8b5212f6017180f10ce36b472dfe52 Dockerfile
 done
@@ -154,13 +154,13 @@ done
 Linter for Go:
 
 ```bash
-docker run --rm --tty --volume $(pwd):/app --workdir /app golangci/golangci-lint:v2.12.2 golangci-lint run --verbose
+docker run --rm --tty --volume $(pwd):/app --workdir /app golangci/golangci-lint:v2.13.2 golangci-lint run --verbose
 ```
 
 Vulnerability/secret scanners:
 
 ```bash
-docker run --rm --volume $(pwd):/app --workdir /app aquasec/trivy:0.71.2 repo .
+docker run --rm --volume $(pwd):/app --workdir /app aquasec/trivy:0.74.0 repo .
 docker run --rm --volume $(pwd):/app --workdir /app chainguard/grype:latest --name linuxfr.org-img --verbose dir:/app
 ```
 
