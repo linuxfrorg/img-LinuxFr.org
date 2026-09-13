@@ -18,8 +18,9 @@ The main benefits of using a proxy instead of linking directly the images are:
 
 Side effects:
 
-- file is changed on remote side (modified or converted into another format), new file will be served after the next fetch
-- file is deleted on remote side, file won't be served after the next try to fetch
+- during refresh period, if the image is changed on remote side (modified or converted into another format), the new image will be served after the next fetch;
+- after refresh period, the image is served from the cache;
+- if the image is deleted on remote side, the image is served from the cache.
 
 How to use it? (outside Docker)
 -------------------------------
@@ -27,7 +28,7 @@ How to use it? (outside Docker)
 [Install Go](http://golang.org/doc/install) and don't forget to set `$GOPATH`
 
     $ go get -v -u github.com/linuxfrorg/img-LinuxFr.org
-    $ img-LinuxFr.org [-a addr] [-r redis] [-l log] [-d dir] [-u agent] [-e avatar] [-c]
+    $ img-LinuxFr.org [-a addr] [-c] [-d dir] [-e avatar] [-l log] [-p refresh] [-r redis] [-u agent]
 
 And, to display the help:
 
@@ -61,23 +62,19 @@ graph TD
   B --> |otherwise| SB[ 405 ]
 
   A --> C[ Avatar /avatars/ or image /img/ ]
-  C --> AA[ bad/invalid path/method 40x]
+  C --> AA[ bad or invalid path or method 40x]
   C --> AC[ check url status]
-  AC --> AD[ undeclared image 404]
-  AC --> AE[ invalid URI 404]
-  AC --> AF[ admin block 404]
+  AC --> AD[ undeclared image or invalid URI or admin block 404]
   AC --> AG[ already in cache]
   AC --> AH[ previous fetch in error]
-  AH --> AL[ not in cache answers 404]
-  AH --> AK[ serve from cache]
-  AC --> AI[ fetch]
-  AI --> | first fetch | AJ[ fetch from server]
-  AJ --> | any DNS/TLS/HTTP error | AM[ answers 404]
-  AJ --> | not a 200/304 | AN[ set in error and answers 404]
-  AJ --> | too big content | AN
-  AJ --> | content-type | AN
-  AJ --> AO[manipulate aka resize if avatar]
-  AN --> AP[save in cache]
+  AH --> | in cache| AK[ serve from cache]
+  AH --> | not in cache | AP[ answers 404]
+  AG --> AK
+  AC --> AI[ fetch during refresh period]
+  AI --> | any DNS/TLS/HTTP error | AM[ answers 404]
+  AI --> | not a 200/304 or too big content or bad content-type | AN[ set in error]
+  AN --> AM
+  AI --> AO[manipulate aka resize if avatar]
   AO --> AK
 ```
 
@@ -85,7 +82,7 @@ graph TD
 - `declared` means that `img/<uri>` in Redis contains a `created_at` field.
 - `admin block` means that `img/<uri>` in Redis contains a `status` field with "Blocked" value.
 - `in error` means that `img/err/<uri>` in Redis exists and file is not in cache from a previous fetch.
-- `in cache` means that `img/<uri>` in Redis contains a `checksum` field. And if img/updated/<uri>` exists, the cache is up-to-date this remote server.
+- `in cache` means that `img/<uri>` in Redis contains a `checksum` field. And if `img/updated/<uri>` exists, the cache is up-to-date with the remote server (last update less than one hour). And if `img/updated/<uri>` doesn't exist, but `created_at` field from `img/<uri>` is older than refresh period, no more update so serve from cache.
 
 ```mermaid
 graph TD
@@ -94,9 +91,9 @@ graph TD
   B --> |img/err/uri| K[ fetch in error]
   K --> |img/uri/checksum| E[ serve from cache disk]
   K --> |not in cache| D[ in error ]
-  D --> |cache refresh interval| B
-  B --> |img/updated/uri exists| E
-  B --> |no img/updated/uri| F[fetch from server]
+  D --> |cache refresh interval one hour| B
+  B --> |img/updated/uri exists or outside refresh period| E
+  B --> |no img/updated/uri and during refresh period| F[fetch from server]
   F --> |got 304| G[reset cache timer]
   F --> |got 200| H[save in cache]  
   F --> K

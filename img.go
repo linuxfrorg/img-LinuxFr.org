@@ -106,22 +106,24 @@ var userAgent string
 // The address for avatars by default
 var defaultAvatarUrl string
 
+// Refresh period in seconds
+var refreshPeriod int64
+
 var ctx = context.Background()
 
 // Check if an URL is valid and not temporarily in error
-func urlStatus(uri string) error {
-	hexists := connection.HExists(ctx, "img/"+uri, "created_at")
-	if err := hexists.Err(); err != nil {
-		return err
-	}
-	if ok := hexists.Val(); !ok {
-		return errors.New("invalid URL")
+func urlStatus(uri string) (createdAtTime string, err error) {
+	createdAtTime, err = connection.HGet(ctx, "img/"+uri, "created_at").Result()
+	if err != nil {
+		return "", err
+	} else if createdAtTime == "" {
+		return "", errors.New("invalid URL")
 	}
 
 	hget := connection.HGet(ctx, "img/"+uri, "status")
 	if err := hget.Err(); err == nil {
 		if status := hget.Val(); status == "Blocked" {
-			return errors.New("invalid URL")
+			return createdAtTime, errors.New("invalid URL")
 		}
 	}
 
@@ -130,12 +132,11 @@ func urlStatus(uri string) error {
 		str := get.Val()
 		try := connection.HGet(ctx, "img/"+uri, "checksum")
 		if try.Err() == nil && try.Val() != "" {
-			return nil // fallback on cache disk despite error
+			return createdAtTime, nil // fallback on cache disk despite error
 		}
-		return errors.New(str)
+		return createdAtTime, errors.New(str)
 	}
-
-	return nil
+	return createdAtTime, nil
 }
 
 // Generate a key for cache from a string
@@ -187,17 +188,22 @@ func resetCacheTimer(uri string) {
 }
 
 // Fetch image from cache
-func fetchImageFromCache(uri string, behaviour Behaviour) (headers Headers, body []byte, err error) {
+func fetchImageFromCache(uri string, behaviour Behaviour, createdAtTime int64) (headers Headers, body []byte, err error) {
 	exists := connection.Exists(ctx, "img/updated/"+uri)
 	if exists.Err() != nil || exists.Val() == 0 {
-		err = fetchImageFromServer(uri, behaviour)
-		if err != nil {
-			hget := connection.HGet(ctx, "img/"+uri, "checksum")
-			if hget.Err() != nil || hget.Val() == "" {
-				return
-			} else {
-				log.Printf("Fail to fetch %s (serve from disk cache anyway)\n", uri)
+		if refreshPeriod < 0 || createdAtTime+refreshPeriod >= time.Now().Unix() {
+			// not too old, let's refresh
+			err = fetchImageFromServer(uri, behaviour)
+			if err != nil {
+				hget := connection.HGet(ctx, "img/"+uri, "checksum")
+				if hget.Err() != nil || hget.Val() == "" {
+					return
+				} else {
+					log.Printf("Fail to fetch %s (serve from disk cache anyway)\n", uri)
+				}
 			}
+		} else {
+			log.Printf("Too old to fetch %s (serve from disk cache)\n", uri)
 		}
 	}
 
@@ -335,7 +341,8 @@ func fetchImageFromServer(uri string, behaviour Behaviour) (err error) {
 
 	body = behaviour.Manipulate(body)
 
-	if urlStatus(uri) == nil {
+	_, err = urlStatus(uri)
+	if err == nil {
 		err = saveImageInCache(uri, contentType, etag, body)
 	}
 	return
@@ -343,14 +350,16 @@ func fetchImageFromServer(uri string, behaviour Behaviour) (err error) {
 
 // Fetch image from cache if available, or from the server
 func fetchImage(uri string, behaviour Behaviour) (headers Headers, body []byte, err error) {
-	err = urlStatus(uri)
+	createdAtTime, err := urlStatus(uri)
 	if err != nil {
 		return
 	}
-
-	headers, body, err = fetchImageFromCache(uri, behaviour)
+	createdAtUnix, err := strconv.ParseInt(createdAtTime, 10, 64)
+	if err != nil {
+		return
+	}
+	headers, body, err = fetchImageFromCache(uri, behaviour, createdAtUnix)
 	headers.cacheControl = fmt.Sprintf("public, max-age=%d", CacheRefreshInterval/time.Second)
-
 	return
 }
 
@@ -630,6 +639,7 @@ func main() {
 	flag.StringVar(&userAgent, "u", "img_LinuxFr.org/1.0", "Use this User-Agent making HTTP requests")
 	flag.StringVar(&defaultAvatarUrl, "e", "//nginx/default-avatar.svg", "Default to this avatar URL")
 	flag.BoolVar(&check, "c", false, "Do no start daemon, just do a sanity check on redis database and cache disk")
+	flag.Int64Var(&refreshPeriod, "p", 7*3600*24, "Refresh images during that period (in seconds, negative value to always refresh)")
 	flag.Parse()
 
 	// Logging
