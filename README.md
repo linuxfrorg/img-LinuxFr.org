@@ -34,13 +34,18 @@ And, to display the help:
 
     $ img-LinuxFr.org -h
 
-How to use it? (with Docker)
--------------------------------
+How to use it? (with a container)
+---------------------------------
 
+Build and run container image
 Build and run Docker image:
 
-    $ docker build --tag linuxfr.org-img .
+    $ docker build --tag linuxfr.org-img --file Containerfile .
     $ docker run --publish 8000:8000 linuxfr.org-img
+
+or
+    $ buildah build --tag linuxfr.org-img --file Containerfile .
+    $ podman run --publish 8000:8000 linuxfr.org-img
 
 How it works?
 -------------
@@ -119,11 +124,11 @@ Key                                            | Type   | Value                 
 
 Testsuite
 ---------
-Testsuite requires docker-compose.
+Testsuite requires `docker-compose` (not `podman-compose` yet).
 
 ```bash
 cd tests/
-docker-compose up --build
+docker-compose --file compose.yaml up --build 
 ```
 
 If everything went well, expect at the end:
@@ -136,29 +141,31 @@ tests_linuxfr.org-img-test_1 exited with code 0
 Extra checks
 ------------
 
-Linter for Dockerfile:
+nb: you may use `podman` instead of `docker`
+
+Linter for Containerfile:
 
 ```bash
-for image in Dockerfile tests/Dockerfile
+for image in Containerfile tests/Containerfile
 do
   # Test with pinned hadolint/hadolint:v2.15.1-debian
-  docker run --rm --interactive hadolint/hadolint@sha256:9a3944b7fddcb947d1ffd90829ac1a6e5c30479223358f249d8b96c7d0019e27 < "$image"
+  docker run --rm --interactive docker.io/hadolint/hadolint@sha256:9a3944b7fddcb947d1ffd90829ac1a6e5c30479223358f249d8b96c7d0019e27 < "$image"
   # Test with replicated/dockerfilelint but last push more than 5 years ago...
-  # docker run --rm --volume $(pwd)/$image:/app/Dockerfile --workdir /app replicated/dockerfilelint@sha256:15ce784e5847966b6d9a88cba348a9429f8b5212f6017180f10ce36b472dfe52 Dockerfile
+  # docker run --rm --volume $(pwd)/$image:/app/Containerfile --workdir /app docker.io/replicated/dockerfilelint@sha256:15ce784e5847966b6d9a88cba348a9429f8b5212f6017180f10ce36b472dfe52 Containerfile
 done
 ```
 
 Linter for Go:
 
 ```bash
-docker run --rm --tty --volume $(pwd):/app --workdir /app golangci/golangci-lint:v2.13.2 golangci-lint run --verbose
+docker run --rm --tty --volume $(pwd):/app --workdir /app docker.io/golangci/golangci-lint:v2.13.2 golangci-lint run --verbose
 ```
 
 Vulnerability/secret scanners:
 
 ```bash
-docker run --rm --volume $(pwd):/app --workdir /app aquasec/trivy:0.74.0 repo .
-docker run --rm --volume $(pwd):/app --workdir /app chainguard/grype:latest --name linuxfr.org-img --verbose dir:/app
+docker run --rm --volume $(pwd):/app --workdir /app docker.io/aquasec/trivy:0.74.0 repo .
+docker run --rm --volume $(pwd):/app --workdir /app docker.io/chainguard/grype:latest --name linuxfr.org-img --verbose dir:/app
 ```
 
 See also

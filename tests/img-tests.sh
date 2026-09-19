@@ -7,7 +7,7 @@ CACHE_IMG="${SCRIPT_DIR}/cache-img"
 WEB_DIR="${SCRIPT_DIR}/data-web"
 NOW="$(date -u "+%s")"
 
-# Hosts from Docker compose file
+# Hosts from container compose file
 IMG="linuxfr.org-img"
 WEB="nginx"
 REDIS="redis"
