@@ -3,7 +3,7 @@ services:
   linuxfr.org-img:
     build:
       context: ..
-    command: -r redis:6379/0 -d /app/cache -l - -a 0.0.0.0:8000 -e //nginx/default-avatar.svg
+    command: -r redis:6379/0 -d /app/cache -l - -a 0.0.0.0:8000 -e //nginx/default-avatar.svg -p -240
     #works also with -r "[fd42:3200:3200::30]:6379/0"
     depends_on:
       redis:

@@ -473,3 +473,19 @@ HTTP/1.1 200
 bytes count == 692
 sha256 toHex == "449d4fc873c1d6d77703f1f0253caecbaac812e3066a3e28402c65370085dae7"
 header "Content-Type" == "image/png"
+
+# http://{{WEB}}/orange_100x100_old.png
+GET http://{{TARGET}}:8000/img/687474703A2F2F{{WEB_HEX}}2F6F72616E67655F313030783130305F6F6C642E706E67
+[Options]
+http2: {{HTTP2}}
+HTTP/1.1 404
+
+# http://{{WEB}}/orange_100x100_will_be_old.png
+GET http://{{TARGET}}:8000/img/687474703A2F2F{{WEB_HEX}}2F6F72616E67655F313030783130305F77696C6C5F62655F6F6C642E706E67
+[Options]
+http2: {{HTTP2}}
+HTTP/1.1 200
+[Asserts]
+bytes count == 329
+sha256 toHex == "f7d78927c514d1c21de9a8546f8d01757478ee5245874d80ce23767d1954f8ed"
+header "Content-Type" == "image/png"
