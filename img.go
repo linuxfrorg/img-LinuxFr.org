@@ -202,9 +202,8 @@ func fetchImageFromCache(uri string, behaviour Behaviour, createdAtTime int64) (
 					log.Printf("Fail to fetch %s (serve from disk cache anyway)\n", uri)
 				}
 			}
-		} else {
-			log.Printf("Too old to fetch %s (serve from disk cache)\n", uri)
 		}
+		// else { log.Printf("Too old to fetch %s (serve from disk cache)\n", uri) }
 	}
 
 	hget := connection.HGet(ctx, "img/"+uri, "type")
@@ -447,7 +446,7 @@ func sanityCheckImgLatest() (latest_img []string) {
 			img, err := connection.Exists(ctx, "img/"+v).Result()
 			if err != nil {
 				log.Printf("Error getting %s listed in img/latest: %s\n", v, err)
-			} else if img != 0 {
+			} else if img == 0 {
 				log.Printf("Image %s listed in img/latest but unknown\n", v)
 			}
 		}
@@ -466,7 +465,7 @@ func sanityCheckImgBlocked() (blocked_img []string) {
 			img, err := connection.Exists(ctx, "img/"+v).Result()
 			if err != nil {
 				log.Printf("Error getting %s listed in img/blocked: %s\n", v, err)
-			} else if img != 0 {
+			} else if img == 0 {
 				log.Printf("Image %s listed in img/blocked but unknown\n", v)
 			}
 		}
