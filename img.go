@@ -387,6 +387,7 @@ func Image(w http.ResponseWriter, r *http.Request, behaviour Behaviour) {
 	w.Header().Add("Cache-Control", headers.cacheControl)
 	_, err = w.Write(body)
 	if err != nil {
+		log.Printf("Internal server error %s: %s\n", encoded_url, err)
 		http.Error(w, "Internal server error", 500)
 		return
 	}
