@@ -158,7 +158,7 @@ done
 Linter for Go:
 
 ```bash
-docker run --rm --tty --volume $(pwd):/app --workdir /app docker.io/golangci/golangci-lint:v2.13.2 golangci-lint run --verbose
+docker run --rm --tty --volume $(pwd):/app --workdir /app docker.io/golangci/golangci-lint:v2.14.0 golangci-lint run --verbose
 ```
 
 Vulnerability/secret scanners:

@@ -23,7 +23,7 @@ RUN go install golang.org/x/vuln/cmd/govulncheck@v1.8.0 \
 RUN apk add --no-cache tzdata=2026d-r0
 
 # Deploy
-FROM docker.io/alpine:3.24.1
+FROM docker.io/alpine:3.24.2
 ARG UID=1000
 ARG GID=1000
 RUN addgroup -g "${GID}" app \
