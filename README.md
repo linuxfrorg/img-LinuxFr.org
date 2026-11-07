@@ -158,13 +158,15 @@ done
 Linter for Go:
 
 ```bash
-docker run --rm --tty --volume $(pwd):/app --workdir /app docker.io/golangci/golangci-lint:v2.15.0 golangci-lint run --verbose
+# Test with pinned golangci/golangci-lint:v2.15.0
+docker run --rm --tty --volume $(pwd):/app --workdir /app docker.io/golangci/golangci-lint@sha256:fbfcfd12a6f8d7f1b97b3362ca80fc2a244d46863148c73cb88e7793af96c481 golangci-lint run --verbose
 ```
 
 Vulnerability/secret scanners:
 
 ```bash
-docker run --rm --volume $(pwd):/app --workdir /app docker.io/aquasec/trivy:0.76.1 repo .
+# Test with pinned docker.io/aquasec/trivy:0.76.2
+docker run --rm --volume $(pwd):/app --workdir /app docker.io/aquasec/trivy@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb repo .
 docker run --rm --volume $(pwd):/app --workdir /app docker.io/chainguard/grype:latest --name linuxfr.org-img --verbose dir:/app
 ```
 

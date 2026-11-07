@@ -20,10 +20,10 @@ RUN go install golang.org/x/vuln/cmd/govulncheck@v1.9.0 \
   && govulncheck -show verbose ./... \
   && govulncheck -show verbose --mode=binary img-LinuxFr.org
 
-RUN apk add --no-cache tzdata=2026e-r0
+RUN apk add --no-cache tzdata=2026f-r0
 
 # Deploy
-FROM docker.io/alpine:3.24.3
+FROM docker.io/alpine:3.24.4
 ARG UID=1000
 ARG GID=1000
 RUN addgroup -g "${GID}" app \
