@@ -128,7 +128,7 @@ Testsuite requires `docker-compose` (not `podman-compose` yet).
 
 ```bash
 cd tests/
-docker-compose --file compose.yaml up --build 
+docker-compose --file compose.yaml up --build
 ```
 
 If everything went well, expect at the end:
